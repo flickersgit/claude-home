@@ -194,6 +194,29 @@ Comprehensive guide for setting up Claude Code on new computers:
 
 ---
 
+## 6. Textastic iPad SSH Setup
+
+### SSH Key Pair Generated
+- Type: ed25519
+- Comment: `textastic-ipad`
+- Private key: `~/.ssh/textastic_ed25519`
+- Public key: `~/.ssh/textastic_ed25519.pub`
+
+### Mac Configuration
+- Added public key to `~/.ssh/authorized_keys`
+- Mac local IP: `192.168.1.225`
+- Requires: Remote Login enabled in System Settings > General > Sharing
+
+### Textastic Connection Settings
+| Setting | Value |
+|---------|-------|
+| Host | `192.168.1.225` |
+| Port | `22` |
+| Username | `statpods` |
+| Auth | Private key file |
+
+---
+
 ## Files Created/Modified This Session
 
 | File | Action |
@@ -201,6 +224,9 @@ Comprehensive guide for setting up Claude Code on new computers:
 | `~/.tmux.conf` | created |
 | `~/.config/ghostty/config` | created |
 | `~/.zshrc` | modified (added cc function) |
+| `~/.ssh/textastic_ed25519` | created (private key) |
+| `~/.ssh/textastic_ed25519.pub` | created (public key) |
+| `~/.ssh/authorized_keys` | modified (added textastic key) |
 | `~/Documents/Claude Home/claude.md` | created |
 | `~/Documents/Claude Home/.gitignore` | created |
 | `~/Documents/Claude Home/memory_log/conversation_20260201.md` | created |
@@ -215,6 +241,7 @@ Comprehensive guide for setting up Claude Code on new computers:
 - User chose GruvboxDark theme for Ghostty
 - tmux is still useful alongside Ghostty for persistent sessions that survive terminal restarts
 - GitHub account: `flickersgit`
-- Git uses HTTPS with gh CLI authentication (SSH keys not configured)
+- Git uses HTTPS with gh CLI authentication (SSH keys not configured for GitHub)
 - Skills installed: document-skills, example-skills (from anthropics/skills repo)
 - Shell: zsh
+- Textastic SSH key configured for iPad access to Mac
