@@ -12,3 +12,4 @@
 
 # Private keys
 setup/textastic_ed25519
+setup/textastic_rsa
