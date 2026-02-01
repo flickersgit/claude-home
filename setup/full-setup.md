@@ -2,6 +2,7 @@
 
 Complete setup instructions for Claude Code on a new computer, including:
 - tmux with `cc` shortcut
+- Claude Code skills
 - Memory log workflow
 - GitHub integration
 
@@ -270,6 +271,74 @@ git config --global user.email "your-username@users.noreply.github.com"
 
 ---
 
+# Claude Code Skills Setup
+
+Skills extend Claude Code with specialized capabilities like document creation, spreadsheet editing, and more.
+
+## Check if Already Installed
+
+First, check if skills are already configured:
+
+```bash
+ls ~/.claude/plugins/installed_plugins.json 2>/dev/null && echo "Skills may already be installed - check file contents"
+```
+
+If skills are already installed, **skip this section**.
+
+## Step 1: Install Skills from Anthropic Repository
+
+In Claude Code, run:
+
+```
+/install-plugin anthropics/skills document-skills
+/install-plugin anthropics/skills example-skills
+```
+
+Or use the CLI:
+
+```bash
+claude /install-plugin anthropics/skills document-skills
+claude /install-plugin anthropics/skills example-skills
+```
+
+## Step 2: Enable Skills
+
+Skills should auto-enable after installation. Verify in `~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "document-skills@anthropic-agent-skills": true,
+    "example-skills@anthropic-agent-skills": true
+  }
+}
+```
+
+## Available Skills
+
+After installation, you'll have access to:
+
+| Skill | Description |
+|-------|-------------|
+| `pdf` | Create, edit, merge PDFs |
+| `docx` | Word document creation and editing |
+| `xlsx` | Spreadsheet with formulas and formatting |
+| `pptx` | Presentation creation |
+| `frontend-design` | Build web components and pages |
+| `canvas-design` | Create visual art and posters |
+| `algorithmic-art` | Generative art with p5.js |
+| `mcp-builder` | Build MCP servers |
+| `skill-creator` | Create custom skills |
+
+## Verification
+
+Test a skill by asking Claude Code:
+```
+Create a simple PDF with "Hello World"
+```
+
+---
+
 # Memory Log Setup
 
 The memory log system maintains conversation continuity across Claude Code sessions.
@@ -441,6 +510,11 @@ For Claude Code to run on a new machine, execute these steps in order:
 4. Create tmux config: Copy content from Step 2 to `~/.tmux.conf`
 5. Add `cc` function: Append to `~/.zshrc` or `~/.bashrc`
 6. Reload shell: `source ~/.zshrc`
+7. Install skills (if not already installed):
+   ```bash
+   claude /install-plugin anthropics/skills document-skills
+   claude /install-plugin anthropics/skills example-skills
+   ```
 
 ---
 
@@ -455,6 +529,14 @@ tmux -V
 # Check GitHub CLI
 gh auth status
 
+# Check skills installed
+cat ~/.claude/settings.json
+
 # Test cc shortcut
 cc claude-home
+```
+
+In Claude Code, test skills:
+```
+Create a simple test.pdf with "Setup complete"
 ```
