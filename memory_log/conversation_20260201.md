@@ -135,6 +135,79 @@ shell-integration = zsh
 
 ---
 
+## 4. Shell Shortcut: `cc` Function
+
+### Purpose
+Quick command to open Claude Code in a tmux session for any project.
+
+### Added to `~/.zshrc`
+
+```bash
+cc() {
+  # If no argument: use current directory name as session
+  # If known project shortcut: use predefined path
+  # Otherwise: use argument as session name, current dir as path
+}
+```
+
+### Usage
+| Command | Behavior |
+|---------|----------|
+| `cc` | Uses current folder name as session, opens Claude Code |
+| `cc claude-home` | Uses predefined shortcut path |
+| `cc my-project` | Uses "my-project" as session name, current directory |
+
+### tmux Session Created
+- Created `claude-home` session pointing to project directory
+- Attach with: `tmux attach -t claude-home`
+
+---
+
+## 5. Setup Documentation
+
+### Created `setup/full-setup.md`
+Comprehensive guide for setting up Claude Code on new computers:
+
+1. **tmux Setup**
+   - Installation (macOS/Linux)
+   - Full `~/.tmux.conf` configuration
+   - `cc` function for zsh/bash
+
+2. **GitHub Setup**
+   - gh CLI installation
+   - Authentication with `gh auth login`
+   - Git credential helper with `gh auth setup-git`
+
+3. **Claude Code Skills Setup**
+   - Check if already installed (skip if exists)
+   - Install commands for document-skills and example-skills
+   - Available skills: pdf, docx, xlsx, pptx, frontend-design, canvas-design, algorithmic-art, mcp-builder, skill-creator
+
+4. **Memory Log Setup**
+   - Directory structure
+   - Full `claude.md` template with workflow instructions
+   - Git repo initialization and push
+
+5. **Quick Setup Section**
+   - All-in-one steps for new machines
+   - Verification commands
+
+---
+
+## Files Created/Modified This Session
+
+| File | Action |
+|------|--------|
+| `~/.tmux.conf` | created |
+| `~/.config/ghostty/config` | created |
+| `~/.zshrc` | modified (added cc function) |
+| `~/Documents/Claude Home/claude.md` | created |
+| `~/Documents/Claude Home/.gitignore` | created |
+| `~/Documents/Claude Home/memory_log/conversation_20260201.md` | created |
+| `~/Documents/Claude Home/setup/full-setup.md` | created |
+
+---
+
 ## Notes for Future Reference
 - User is on macOS (Darwin 24.6.0)
 - Homebrew is installed at `/usr/local/bin/brew`
@@ -143,3 +216,5 @@ shell-integration = zsh
 - tmux is still useful alongside Ghostty for persistent sessions that survive terminal restarts
 - GitHub account: `flickersgit`
 - Git uses HTTPS with gh CLI authentication (SSH keys not configured)
+- Skills installed: document-skills, example-skills (from anthropics/skills repo)
+- Shell: zsh
