@@ -156,6 +156,11 @@ Key features:
 | `cc ls` | List all tmux sessions |
 | `cc kill <name>` | Kill a tmux session |
 
+### Always Open Claude
+- New session: Creates tmux session and runs Claude directly
+- Existing session: Sends `claude` command to session before attaching
+- Claude always starts when `cc` is invoked
+
 ### SSH Compatibility Fix
 - Initial version didn't work over SSH (Textastic iPad)
 - Issue: Shell functions use bare `tmux` command, not found in SSH PATH

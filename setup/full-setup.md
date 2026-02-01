@@ -146,9 +146,11 @@ cc() {
 
   # Create or attach to tmux session and run claude
   if /usr/local/bin/tmux has-session -t "$project" 2>/dev/null; then
+    # Send claude command to existing session, then attach
+    /usr/local/bin/tmux send-keys -t "$project" "$HOME/.local/bin/claude" Enter
     /usr/local/bin/tmux attach -t "$project"
   else
-    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude; zsh"
+    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude"
   fi
 }
 ```
@@ -197,9 +199,11 @@ cc() {
 
   # Create or attach to tmux session and run claude
   if /usr/local/bin/tmux has-session -t "$project" 2>/dev/null; then
+    # Send claude command to existing session, then attach
+    /usr/local/bin/tmux send-keys -t "$project" "$HOME/.local/bin/claude" Enter
     /usr/local/bin/tmux attach -t "$project"
   else
-    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude; bash"
+    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude"
   fi
 }
 ```
