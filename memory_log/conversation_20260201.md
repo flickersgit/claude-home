@@ -97,14 +97,41 @@ shell-integration = zsh
 
 ---
 
+---
+
+## 3. Claude Home Project Setup
+
+### Purpose Defined
+- Created `claude.md` as project configuration file
+- Purpose: Central hub for setting up Claude Code across all projects
+- Created `memory_log/` subfolder for conversation logs
+
+### Workflow Instructions Added to `claude.md`
+- **On session start**: Read today's and yesterday's memory logs for context
+- **Before session end**: Create/update memory log with session details
+- **After updating log**: Git commit and push to GitHub
+
+### Git Repository Setup
+- Initialized git in `/Users/statpods/Documents/Claude Home`
+- Created private GitHub repo: https://github.com/flickersgit/claude-home
+- Configured git identity:
+  - Name: `flickersgit`
+  - Email: `flickersgit@users.noreply.github.com`
+- Configured `gh auth setup-git` for HTTPS authentication
+- Created `.gitignore` (excludes .DS_Store, .env, editor files)
+- Initial commit pushed to `main` branch
+
+---
+
 ## Files Created This Session
 
 | File | Purpose |
 |------|---------|
 | `~/.tmux.conf` | tmux configuration |
 | `~/.config/ghostty/config` | Ghostty configuration |
-| `~/Documents/Claude Home/claude.md` | Brief session summary |
-| `~/Documents/Claude Home/conversation_20260201.md` | This detailed log |
+| `~/Documents/Claude Home/claude.md` | Project config with workflow instructions |
+| `~/Documents/Claude Home/.gitignore` | Git ignore rules |
+| `~/Documents/Claude Home/memory_log/conversation_20260201.md` | This detailed log |
 
 ---
 
@@ -114,3 +141,5 @@ shell-integration = zsh
 - User prefers vim-style keybindings (based on tmux config)
 - User chose GruvboxDark theme for Ghostty
 - tmux is still useful alongside Ghostty for persistent sessions that survive terminal restarts
+- GitHub account: `flickersgit`
+- Git uses HTTPS with gh CLI authentication (SSH keys not configured)
