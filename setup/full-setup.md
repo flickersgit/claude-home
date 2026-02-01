@@ -107,10 +107,22 @@ Detect shell and add the `cc` function.
 Append to `~/.zshrc`:
 
 ```bash
-# Claude Code with tmux - usage: cc [project-name]
+# Claude Code with tmux - usage: cc [project-name|ls|kill <name>]
 cc() {
   local project="$1"
   local path
+
+  # Commands
+  case "$project" in
+    ls|list)
+      /usr/local/bin/tmux ls 2>/dev/null || echo "No sessions"
+      return
+      ;;
+    kill)
+      /usr/local/bin/tmux kill-session -t "$2" 2>/dev/null && echo "Killed: $2" || echo "Session not found: $2"
+      return
+      ;;
+  esac
 
   # Define project shortcuts (add more as needed)
   declare -A projects
@@ -133,10 +145,10 @@ cc() {
   fi
 
   # Create or attach to tmux session and run claude
-  if tmux has-session -t "$project" 2>/dev/null; then
-    tmux attach -t "$project"
+  if /usr/local/bin/tmux has-session -t "$project" 2>/dev/null; then
+    /usr/local/bin/tmux attach -t "$project"
   else
-    tmux new-session -s "$project" -c "$path" "claude; zsh"
+    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude; zsh"
   fi
 }
 ```
@@ -146,10 +158,22 @@ cc() {
 Append to `~/.bashrc`:
 
 ```bash
-# Claude Code with tmux - usage: cc [project-name]
+# Claude Code with tmux - usage: cc [project-name|ls|kill <name>]
 cc() {
   local project="$1"
   local path
+
+  # Commands
+  case "$project" in
+    ls|list)
+      /usr/local/bin/tmux ls 2>/dev/null || echo "No sessions"
+      return
+      ;;
+    kill)
+      /usr/local/bin/tmux kill-session -t "$2" 2>/dev/null && echo "Killed: $2" || echo "Session not found: $2"
+      return
+      ;;
+  esac
 
   # Define project shortcuts (add more as needed)
   declare -A projects
@@ -172,10 +196,10 @@ cc() {
   fi
 
   # Create or attach to tmux session and run claude
-  if tmux has-session -t "$project" 2>/dev/null; then
-    tmux attach -t "$project"
+  if /usr/local/bin/tmux has-session -t "$project" 2>/dev/null; then
+    /usr/local/bin/tmux attach -t "$project"
   else
-    tmux new-session -s "$project" -c "$path" "claude; bash"
+    /usr/local/bin/tmux new-session -s "$project" -c "$path" "$HOME/.local/bin/claude; bash"
   fi
 }
 ```
@@ -197,6 +221,8 @@ source ~/.zshrc   # or ~/.bashrc
 | `cc` | Uses current folder name as session, opens Claude Code |
 | `cc claude-home` | Uses predefined shortcut path |
 | `cc my-project` | Uses "my-project" as session name, current directory |
+| `cc ls` | List all tmux sessions |
+| `cc kill <name>` | Kill a tmux session |
 
 ---
 

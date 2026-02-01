@@ -142,13 +142,10 @@ Quick command to open Claude Code in a tmux session for any project.
 
 ### Added to `~/.zshrc`
 
-```bash
-cc() {
-  # If no argument: use current directory name as session
-  # If known project shortcut: use predefined path
-  # Otherwise: use argument as session name, current dir as path
-}
-```
+Key features:
+- Uses full paths (`/usr/local/bin/tmux`, `$HOME/.local/bin/claude`) for SSH compatibility
+- Supports project shortcuts via associative array
+- Includes `ls` and `kill` subcommands
 
 ### Usage
 | Command | Behavior |
@@ -156,6 +153,14 @@ cc() {
 | `cc` | Uses current folder name as session, opens Claude Code |
 | `cc claude-home` | Uses predefined shortcut path |
 | `cc my-project` | Uses "my-project" as session name, current directory |
+| `cc ls` | List all tmux sessions |
+| `cc kill <name>` | Kill a tmux session |
+
+### SSH Compatibility Fix
+- Initial version didn't work over SSH (Textastic iPad)
+- Issue: Shell functions use bare `tmux` command, not found in SSH PATH
+- Fix: Changed to full paths `/usr/local/bin/tmux` and `$HOME/.local/bin/claude`
+- Also created `~/.zshenv`, `~/.zprofile`, `~/.bash_profile`, `~/.profile` for PATH setup
 
 ### tmux Session Created
 - Created `claude-home` session pointing to project directory
