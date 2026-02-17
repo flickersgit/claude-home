@@ -67,8 +67,9 @@ let musicVolume=0.35;
 let musicMuted=false;
 
 function stopMusic(){
+  stopScheduler();
   musicNodes.forEach(n=>{
-    try{n.stop();n.disconnect();}catch(e){}
+    try{n.node.stop();n.node.disconnect();n.gain.disconnect();}catch(e){}
   });
   musicNodes=[];
   musicPlaying=null;
@@ -85,42 +86,75 @@ function createOsc(type,freq,gainVal,dest){
   return{osc:o,gain:g};
 }
 
-// Schedule a repeating note pattern
+// Lookahead scheduler: only schedule a few loops ahead, then keep topping up
+const SCHEDULE_AHEAD=4; // loops to schedule ahead
+const SCHEDULE_INTERVAL=500; // ms between scheduler checks
+let schedulerTimer=null;
+let activePatterns=[];
+
 function schedulePattern(notes,bpm,type,vol,loopLen,startTime){
   const beatDur=60/bpm;
-  const allNodes=[];
+  const loopDur=loopLen*beatDur;
 
-  function scheduleLoop(baseTime){
-    notes.forEach(([beat,freq,dur])=>{
+  const pattern={notes,bpm,type,vol,loopLen,beatDur,loopDur,startTime,nextLoop:0};
+  // Schedule initial batch
+  scheduleLoopsFor(pattern,SCHEDULE_AHEAD);
+  activePatterns.push(pattern);
+  return[];
+}
+
+function scheduleLoopsFor(p,count){
+  for(let i=0;i<count;i++){
+    const baseTime=p.startTime+p.nextLoop*p.loopDur;
+    p.notes.forEach(([beat,freq,dur])=>{
       const o=AC.createOscillator();
       const g=AC.createGain();
-      o.type=type;
+      o.type=p.type;
       o.connect(g);
       g.connect(masterGain);
 
-      const noteStart=baseTime+beat*beatDur;
-      const noteEnd=noteStart+dur*beatDur;
+      const noteStart=baseTime+beat*p.beatDur;
+      const noteEnd=noteStart+dur*p.beatDur;
 
       o.frequency.setValueAtTime(freq,noteStart);
       g.gain.setValueAtTime(0,noteStart-0.01);
-      g.gain.linearRampToValueAtTime(vol,noteStart+0.01);
-      g.gain.setValueAtTime(vol,noteEnd-0.03);
+      g.gain.linearRampToValueAtTime(p.vol,noteStart+0.01);
+      g.gain.setValueAtTime(p.vol,noteEnd-0.03);
       g.gain.linearRampToValueAtTime(0,noteEnd);
 
+      const stopAt=noteEnd+0.05;
       o.start(noteStart-0.01);
-      o.stop(noteEnd+0.05);
-      allNodes.push(o);
-      musicNodes.push(o);
+      o.stop(stopAt);
+      musicNodes.push({node:o,gain:g,end:stopAt});
     });
+    p.nextLoop++;
   }
+}
 
-  // Schedule multiple loops ahead
-  const loopDur=loopLen*beatDur;
-  const totalLoops=120; // ~2-4 min depending on bpm
-  for(let i=0;i<totalLoops;i++){
-    scheduleLoop(startTime+i*loopDur);
-  }
-  return allNodes;
+function startScheduler(){
+  stopScheduler();
+  schedulerTimer=setInterval(()=>{
+    const now=AC.currentTime;
+    activePatterns.forEach(p=>{
+      const scheduledUntil=p.startTime+p.nextLoop*p.loopDur;
+      const horizon=now+SCHEDULE_AHEAD*p.loopDur;
+      if(scheduledUntil<horizon){
+        const needed=Math.ceil((horizon-scheduledUntil)/p.loopDur);
+        scheduleLoopsFor(p,needed);
+      }
+    });
+    // Prune finished nodes to free memory
+    const now2=AC.currentTime;
+    musicNodes=musicNodes.filter(n=>{
+      if(n.end<now2){try{n.node.disconnect();n.gain.disconnect();}catch(e){}return false;}
+      return true;
+    });
+  },SCHEDULE_INTERVAL);
+}
+
+function stopScheduler(){
+  if(schedulerTimer){clearInterval(schedulerTimer);schedulerTimer=null;}
+  activePatterns=[];
 }
 
 // ---- MENU MUSIC: Epic NBA intro vibe ----
@@ -175,6 +209,7 @@ function playMenuMusic(){
     [9,200,0.1],[11,200,0.1],[13,200,0.1],[15,200,0.1],
   ];
   schedulePattern(snare,bpm,'sawtooth',0.06,16,t);
+  startScheduler();
 }
 
 // ---- GAME MUSIC: High energy playoff intensity ----
@@ -246,6 +281,7 @@ function playGameMusic(){
     [8,82,0.3],[9,82,0.3],[10,82,0.3],[10.5,82,0.15],[11,98,0.5],
   ];
   schedulePattern(chant,bpm,'triangle',0.05,16,t);
+  startScheduler();
 }
 
 // ---- ON FIRE MUSIC: Extra hype layer ----
@@ -297,6 +333,7 @@ function playFireMusic(){
   const hh=[];
   for(let i=0;i<32;i+=0.25) hh.push([i/4,12000,0.02]);
   schedulePattern(hh,bpm,'square',0.012,8,t);
+  startScheduler();
 }
 
 // ---- RESULT MUSIC: Victory fanfare ----
@@ -362,6 +399,7 @@ function playResultMusic(winner){
     sparkle.push([i+0.25,f,0.1],[i+0.75,f+200,0.1],[i+1.5,f+100,0.1]);
   }
   schedulePattern(sparkle,bpm,'sine',0.02,32,t);
+  startScheduler();
 }
 
 function toggleMusic(){
