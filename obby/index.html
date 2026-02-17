@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBBY - Obstacle Course</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  canvas {
+    border: 2px solid #333;
+    border-radius: 8px;
+    image-rendering: pixelated;
+  }
+  #ui {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 30px;
+    color: #fff;
+    font-size: 18px;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    z-index: 10;
+    pointer-events: none;
+  }
+  #ui span { opacity: 0.9; }
+  #menu {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    z-index: 20;
+  }
+  #menu h1 {
+    font-size: 64px;
+    color: #fff;
+    text-shadow: 0 0 30px #f06, 0 0 60px #f06;
+    letter-spacing: 8px;
+  }
+  #menu h2 {
+    font-size: 20px;
+    color: #aaa;
+    font-weight: 400;
+  }
+  #menu button {
+    padding: 14px 50px;
+    font-size: 22px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f06, #f90);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: 2px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(255,100,0,0.4);
+  }
+  #menu button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 30px rgba(255,100,0,0.6);
+  }
+  #controls {
+    color: #666;
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.8;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>OBBY</h1>
+  <h2>Obstacle Course</h2>
+  <button id="startBtn">PLAY</button>
+  <div id="controls">
+    WASD / Arrow Keys to move<br>
+    Space to jump &bull; Wall jump off walls<br>
+    R to restart checkpoint<br>
+    <br><b style="color:#f44">20 STAGES &mdash; Stages 11-20: HARD MODE</b>
+  </div>
+</div>
+
+<div id="ui" class="hidden">
+  <span>Stage: <b id="stageNum">1</b> / <b id="stageTotal">10</b></span>
+  <span>Deaths: <b id="deathCount">0</b></span>
+  <span>Time: <b id="timer">0.0</b>s</span>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = 960, H = 540;
+canvas.width = W; canvas.height = H;
+
+// --- State ---
+let gameState = 'menu'; // menu | playing | win
+let deaths = 0;
+let startTime = 0;
+let elapsed = 0;
+let currentStage = 0;
+let cameraX = 0, cameraY = 0;
+
+// --- Input ---
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; if (['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// --- Player ---
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  w: 20, h: 28,
+  onGround: false,
+  wallSliding: false,
+  wallDir: 0,
+  jumpBuffer: 0,
+  coyoteTime: 0,
+  color: '#4af',
+  trail: [],
+  respawnX: 0, respawnY: 0,
+};
+
+const GRAVITY = 0.55;
+const JUMP_FORCE = -11;
+const WALL_JUMP_FORCE_X = 7;
+const WALL_JUMP_FORCE_Y = -10;
+const MAX_SPEED = 5;
+const ACCEL = 0.6;
+const FRICTION = 0.82;
+const WALL_SLIDE_SPEED = 1.5;
+
+// --- Level Building ---
+// Platform types: solid, lava, ice, bounce, moving, crumble, checkpoint, finish
+function rect(x, y, w, h, type = 'solid') {
+  return { x, y, w, h, type, origX: x, origY: y, timer: 0, crumbling: false, visible: true };
+}
+
+function buildLevels() {
+  const stages = [];
+
+  // Stage 1: Basics - simple jumps
+  stages.push({
+    spawn: [50, 400],
+    platforms: [
+      rect(0, 460, 200, 40),
+      rect(260, 420, 120, 20),
+      rect(440, 380, 100, 20),
+      rect(600, 340, 100, 20),
+      rect(760, 300, 140, 20),
+      rect(760, 300, 20, 160),
+      rect(880, 280, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1000, 40, 'lava')],
+    decorText: 'Welcome! Jump across!',
+  });
+
+  // Stage 2: Moving platforms
+  stages.push({
+    spawn: [50, 400],
+    platforms: [
+      rect(0, 460, 150, 40),
+      rect(250, 420, 80, 15, 'moving'), // moves horizontally
+      rect(450, 380, 80, 15, 'moving'),
+      rect(650, 340, 80, 15, 'moving'),
+      rect(830, 300, 100, 20),
+      rect(910, 280, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1100, 40, 'lava')],
+    movingData: [
+      { idx: 1, axis: 'x', range: 80, speed: 1.2 },
+      { idx: 2, axis: 'x', range: 90, speed: 1.5 },
+      { idx: 3, axis: 'y', range: 60, speed: 1.0 },
+    ],
+    decorText: 'Moving platforms!',
+  });
+
+  // Stage 3: Lava floor + bouncy pads
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 420, 120, 20),
+      rect(180, 460, 40, 15, 'bounce'),
+      rect(300, 400, 80, 20),
+      rect(440, 460, 40, 15, 'bounce'),
+      rect(560, 350, 80, 20),
+      rect(700, 460, 40, 15, 'bounce'),
+      rect(820, 280, 100, 20),
+      rect(900, 260, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1100, 40, 'lava')],
+    decorText: 'Bounce pads! Boing!',
+  });
+
+  // Stage 4: Wall jumps
+  stages.push({
+    spawn: [50, 420],
+    platforms: [
+      rect(0, 460, 120, 40),
+      rect(200, 200, 20, 300),  // left wall
+      rect(300, 200, 20, 300),  // right wall
+      rect(200, 200, 120, 20),  // top
+      rect(380, 300, 120, 20),
+      rect(480, 280, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 600, 40, 'lava')],
+    decorText: 'Wall jump! Slide & leap!',
+  });
+
+  // Stage 5: Crumbling platforms
+  stages.push({
+    spawn: [50, 400],
+    platforms: [
+      rect(0, 460, 120, 40),
+      rect(200, 420, 80, 15, 'crumble'),
+      rect(350, 380, 80, 15, 'crumble'),
+      rect(500, 340, 80, 15, 'crumble'),
+      rect(650, 300, 80, 15, 'crumble'),
+      rect(800, 260, 120, 20),
+      rect(900, 240, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1100, 40, 'lava')],
+    decorText: 'Crumbling! Don\'t stop!',
+  });
+
+  // Stage 6: Ice platforms (slippery)
+  stages.push({
+    spawn: [50, 400],
+    platforms: [
+      rect(0, 460, 120, 40),
+      rect(200, 430, 120, 15, 'ice'),
+      rect(400, 400, 120, 15, 'ice'),
+      rect(600, 370, 120, 15, 'ice'),
+      rect(800, 340, 120, 15, 'ice'),
+      rect(990, 310, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    decorText: 'Ice! Slippery!',
+  });
+
+  // Stage 7: Mixed challenge
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 420, 100, 40),
+      rect(170, 460, 40, 15, 'bounce'),
+      rect(280, 340, 60, 15, 'crumble'),
+      rect(400, 380, 80, 15, 'moving'),
+      rect(580, 320, 20, 180),  // wall
+      rect(660, 320, 20, 180),  // wall
+      rect(580, 320, 100, 15),
+      rect(740, 260, 100, 20),
+      rect(820, 240, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1000, 40, 'lava')],
+    movingData: [
+      { idx: 3, axis: 'y', range: 70, speed: 1.3 },
+    ],
+    decorText: 'Mix it up!',
+  });
+
+  // Stage 8: Precision jumps
+  stages.push({
+    spawn: [50, 400],
+    platforms: [
+      rect(0, 460, 80, 40),
+      rect(150, 430, 30, 10),
+      rect(260, 400, 30, 10),
+      rect(370, 370, 30, 10),
+      rect(480, 400, 30, 10),
+      rect(590, 370, 30, 10),
+      rect(700, 340, 30, 10),
+      rect(800, 310, 100, 20),
+      rect(880, 290, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1100, 40, 'lava')],
+    decorText: 'Tiny platforms! Focus!',
+  });
+
+  // Stage 9: The gauntlet
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 420, 100, 40),
+      rect(170, 400, 60, 15, 'ice'),
+      rect(300, 460, 40, 15, 'bounce'),
+      rect(420, 350, 60, 15, 'crumble'),
+      rect(550, 380, 70, 15, 'moving'),
+      rect(720, 200, 20, 300), // wall
+      rect(800, 200, 20, 300), // wall
+      rect(720, 200, 100, 15),
+      rect(880, 180, 100, 20),
+      rect(960, 160, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    movingData: [
+      { idx: 4, axis: 'x', range: 60, speed: 1.8 },
+    ],
+    decorText: 'The Gauntlet!',
+  });
+
+  // Stage 10: Original finale (now midpoint)
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 420, 80, 40),
+      rect(140, 460, 30, 15, 'bounce'),
+      rect(240, 350, 40, 10, 'crumble'),
+      rect(340, 380, 50, 15, 'moving'),
+      rect(480, 340, 40, 15, 'ice'),
+      rect(580, 200, 20, 300),
+      rect(660, 200, 20, 300),
+      rect(580, 200, 100, 15),
+      rect(740, 300, 50, 15, 'moving'),
+      rect(880, 250, 30, 10, 'crumble'),
+      rect(980, 200, 120, 20),
+      rect(1060, 180, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1300, 40, 'lava')],
+    movingData: [
+      { idx: 3, axis: 'y', range: 60, speed: 1.4 },
+      { idx: 8, axis: 'x', range: 80, speed: 1.6 },
+    ],
+    decorText: 'Halfway there!',
+  });
+
+  // ========== HARD MODE (Stages 11-20) ==========
+
+  // Stage 11: Spike Corridor - spikes on floor, tiny platforms
+  stages.push({
+    spawn: [50, 380],
+    platforms: [
+      rect(0, 440, 80, 20),
+      rect(140, 410, 22, 8),
+      rect(230, 380, 22, 8),
+      rect(320, 410, 22, 8),
+      rect(410, 380, 22, 8),
+      rect(500, 410, 22, 8),
+      rect(590, 380, 22, 8),
+      rect(680, 350, 22, 8),
+      rect(770, 320, 80, 20),
+      rect(830, 300, 40, 40, 'checkpoint'),
+    ],
+    lava: [
+      rect(0, 500, 1000, 40, 'lava'),
+      // Spike pillars from below
+      rect(180, 460, 30, 40, 'lava'),
+      rect(290, 460, 30, 40, 'lava'),
+      rect(400, 460, 30, 40, 'lava'),
+      rect(510, 460, 30, 40, 'lava'),
+      rect(620, 460, 30, 40, 'lava'),
+    ],
+    decorText: 'HARD MODE! Spike Corridor!',
+  });
+
+  // Stage 12: Conveyor Chaos
+  stages.push({
+    spawn: [50, 380],
+    platforms: [
+      rect(0, 440, 80, 20),
+      rect(160, 420, 120, 15, 'conveyorR'),
+      rect(350, 390, 120, 15, 'conveyorL'),
+      rect(540, 360, 120, 15, 'conveyorR'),
+      rect(730, 330, 120, 15, 'conveyorL'),
+      rect(920, 300, 80, 20),
+      rect(980, 280, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    decorText: 'Conveyor belts! Fight the flow!',
+  });
+
+  // Stage 13: Falling Crumble Chain
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 430, 60, 20),
+      rect(130, 410, 50, 12, 'crumble'),
+      rect(240, 390, 50, 12, 'crumble'),
+      rect(350, 370, 50, 12, 'crumble'),
+      rect(460, 350, 50, 12, 'crumble'),
+      rect(570, 330, 50, 12, 'crumble'),
+      rect(680, 310, 50, 12, 'crumble'),
+      rect(790, 290, 50, 12, 'crumble'),
+      rect(900, 270, 50, 12, 'crumble'),
+      rect(1010, 250, 80, 20),
+      rect(1070, 230, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1300, 40, 'lava')],
+    decorText: 'ALL crumble! Never stop running!',
+  });
+
+  // Stage 14: Fast Moving Madness
+  stages.push({
+    spawn: [50, 380],
+    platforms: [
+      rect(0, 440, 80, 20),
+      rect(200, 400, 50, 12, 'moving'),
+      rect(380, 360, 50, 12, 'moving'),
+      rect(560, 320, 50, 12, 'moving'),
+      rect(740, 280, 50, 12, 'moving'),
+      rect(920, 240, 80, 20),
+      rect(980, 220, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    movingData: [
+      { idx: 1, axis: 'y', range: 80, speed: 2.2 },
+      { idx: 2, axis: 'x', range: 100, speed: 2.5 },
+      { idx: 3, axis: 'y', range: 90, speed: 2.8 },
+      { idx: 4, axis: 'x', range: 80, speed: 3.0 },
+    ],
+    decorText: 'FAST platforms! Time your jumps!',
+  });
+
+  // Stage 15: Ice Wall Jump Tower
+  stages.push({
+    spawn: [50, 420],
+    platforms: [
+      rect(0, 460, 100, 40),
+      // Ice walls - must wall jump upward
+      rect(200, 100, 20, 400, 'ice'),
+      rect(320, 100, 20, 400, 'ice'),
+      // Lava gaps in walls
+      rect(200, 280, 20, 5, 'lava'),
+      rect(320, 350, 20, 5, 'lava'),
+      rect(200, 200, 20, 5, 'lava'),
+      rect(200, 100, 140, 15),
+      rect(420, 150, 100, 20),
+      rect(500, 130, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 700, 40, 'lava')],
+    decorText: 'Ice walls! Watch for lava gaps!',
+  });
+
+  // Stage 16: Bounce Precision
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 430, 60, 20),
+      rect(150, 470, 25, 12, 'bounce'),
+      rect(300, 300, 25, 8),
+      rect(380, 470, 25, 12, 'bounce'),
+      rect(520, 260, 25, 8),
+      rect(620, 470, 25, 12, 'bounce'),
+      rect(750, 220, 25, 8),
+      rect(850, 470, 25, 12, 'bounce'),
+      rect(980, 180, 80, 20),
+      rect(1040, 160, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    decorText: 'Bounce aim! Land on tiny ledges!',
+  });
+
+  // Stage 17: The Labyrinth - walls, crumble, conveyor
+  stages.push({
+    spawn: [50, 170],
+    platforms: [
+      rect(0, 220, 80, 20),
+      rect(0, 300, 200, 15),
+      rect(180, 220, 15, 80),  // wall down
+      rect(180, 220, 150, 15, 'conveyorR'),
+      rect(330, 220, 15, 95),  // wall down
+      rect(330, 300, 150, 15, 'conveyorL'),
+      rect(465, 220, 15, 80),
+      rect(465, 220, 150, 15, 'crumble'),
+      rect(600, 220, 15, 95),
+      rect(600, 300, 100, 15),
+      rect(680, 280, 40, 40, 'checkpoint'),
+    ],
+    lava: [
+      rect(0, 500, 900, 40, 'lava'),
+      rect(0, 380, 700, 120, 'lava'),
+    ],
+    decorText: 'The Labyrinth!',
+  });
+
+  // Stage 18: Disappearing Floor
+  stages.push({
+    spawn: [50, 380],
+    platforms: [
+      rect(0, 440, 60, 20),
+      rect(120, 430, 60, 12, 'crumble'),
+      rect(220, 430, 60, 12, 'moving'),
+      rect(370, 400, 40, 10, 'crumble'),
+      rect(460, 460, 30, 12, 'bounce'),
+      rect(570, 320, 40, 10, 'crumble'),
+      rect(660, 350, 50, 12, 'moving'),
+      rect(790, 300, 40, 10, 'ice'),
+      rect(880, 280, 40, 10, 'crumble'),
+      rect(970, 250, 80, 20),
+      rect(1030, 230, 40, 40, 'checkpoint'),
+    ],
+    lava: [rect(0, 500, 1200, 40, 'lava')],
+    movingData: [
+      { idx: 2, axis: 'y', range: 50, speed: 2.5 },
+      { idx: 6, axis: 'x', range: 70, speed: 2.8 },
+    ],
+    decorText: 'Everything falls apart!',
+  });
+
+  // Stage 19: Death Climb
+  stages.push({
+    spawn: [50, 420],
+    platforms: [
+      rect(0, 460, 80, 40),
+      // Vertical climb with hazards
+      rect(150, 380, 60, 12, 'moving'),
+      rect(280, 300, 20, 8),
+      rect(180, 230, 50, 12, 'crumble'),
+      rect(320, 170, 20, 8, 'ice'),
+      rect(160, 110, 50, 12, 'moving'),
+      // Top section
+      rect(300, 80, 20, 200),
+      rect(400, 80, 20, 200),
+      rect(300, 80, 120, 15),
+      rect(480, 120, 50, 12, 'moving'),
+      rect(600, 80, 80, 20),
+      rect(660, 60, 40, 40, 'checkpoint'),
+    ],
+    lava: [
+      rect(0, 500, 800, 40, 'lava'),
+      rect(100, 460, 200, 10, 'lava'),
+    ],
+    movingData: [
+      { idx: 1, axis: 'x', range: 50, speed: 2.0 },
+      { idx: 5, axis: 'x', range: 60, speed: 2.3 },
+      { idx: 9, axis: 'y', range: 40, speed: 2.5 },
+    ],
+    decorText: 'Death Climb! Go UP!',
+  });
+
+  // Stage 20: FINAL BOSS - Ultimate Challenge
+  stages.push({
+    spawn: [50, 370],
+    platforms: [
+      rect(0, 430, 50, 20),
+      // Phase 1: fast conveyors
+      rect(120, 420, 80, 12, 'conveyorR'),
+      rect(260, 460, 25, 12, 'bounce'),
+      // Phase 2: crumble chain over lava
+      rect(370, 360, 35, 10, 'crumble'),
+      rect(460, 340, 35, 10, 'crumble'),
+      rect(550, 320, 35, 10, 'crumble'),
+      // Phase 3: fast moving + ice
+      rect(650, 350, 40, 10, 'moving'),
+      rect(800, 300, 50, 12, 'ice'),
+      // Phase 4: wall jump with moving walls
+      rect(920, 100, 20, 400),
+      rect(1020, 100, 20, 400),
+      rect(920, 100, 120, 15),
+      // Phase 5: final stretch
+      rect(1100, 200, 40, 10, 'crumble'),
+      rect(1200, 250, 30, 12, 'moving'),
+      rect(1350, 180, 25, 8, 'ice'),
+      rect(1450, 460, 25, 12, 'bounce'),
+      rect(1550, 130, 100, 20),
+      rect(1620, 110, 50, 40, 'finish'),
+    ],
+    lava: [
+      rect(0, 500, 1800, 40, 'lava'),
+      // Lava pillars
+      rect(300, 420, 40, 80, 'lava'),
+      rect(500, 380, 30, 120, 'lava'),
+      rect(750, 360, 30, 140, 'lava'),
+      rect(1130, 260, 30, 240, 'lava'),
+      rect(1300, 240, 30, 260, 'lava'),
+    ],
+    movingData: [
+      { idx: 6, axis: 'y', range: 70, speed: 2.8 },
+      { idx: 12, axis: 'x', range: 60, speed: 3.0 },
+    ],
+    decorText: 'FINAL BOSS! GOOD LUCK!',
+  });
+
+  return stages;
+}
+
+let stages = buildLevels();
+let platforms = [];
+let lavaBlocks = [];
+let movingData = [];
+let particles = [];
+let textPopups = [];
+
+function loadStage(idx) {
+  currentStage = idx;
+  const s = stages[idx];
+  platforms = s.platforms.map(p => ({ ...p, timer: 0, crumbling: false, visible: true, origX: p.x, origY: p.y }));
+  lavaBlocks = s.lava || [];
+  movingData = s.movingData || [];
+  player.x = s.spawn[0];
+  player.y = s.spawn[1];
+  player.vx = 0;
+  player.vy = 0;
+  player.respawnX = s.spawn[0];
+  player.respawnY = s.spawn[1];
+  player.trail = [];
+  particles = [];
+  document.getElementById('stageNum').textContent = idx + 1;
+  document.getElementById('stageTotal').textContent = stages.length;
+  if (s.decorText) {
+    textPopups.push({ text: s.decorText, x: W / 2, y: 80, life: 180, maxLife: 180 });
+  }
+}
+
+function die() {
+  deaths++;
+  document.getElementById('deathCount').textContent = deaths;
+  // Death particles
+  for (let i = 0; i < 20; i++) {
+    particles.push({
+      x: player.x + player.w / 2,
+      y: player.y + player.h / 2,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8,
+      life: 40 + Math.random() * 20,
+      color: ['#f44', '#f90', '#ff0'][Math.floor(Math.random() * 3)],
+      size: 3 + Math.random() * 4,
+    });
+  }
+  player.x = player.respawnX;
+  player.y = player.respawnY;
+  player.vx = 0;
+  player.vy = 0;
+  player.trail = [];
+}
+
+function collides(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function updateMoving(dt) {
+  const t = performance.now() / 1000;
+  for (const m of movingData) {
+    const p = platforms[m.idx];
+    if (!p) continue;
+    if (m.axis === 'x') {
+      p.x = p.origX + Math.sin(t * m.speed) * m.range;
+    } else {
+      p.y = p.origY + Math.sin(t * m.speed) * m.range;
+    }
+  }
+}
+
+function updatePlayer() {
+  const onIce = player.onGround && platforms.some(p =>
+    p.type === 'ice' && p.visible && collides({ x: player.x, y: player.y + player.h, w: player.w, h: 2 }, p)
+  );
+  const conveyorPush = player.onGround ? platforms.reduce((v, p) => {
+    if ((p.type === 'conveyorR' || p.type === 'conveyorL') && p.visible &&
+        collides({ x: player.x, y: player.y + player.h, w: player.w, h: 2 }, p)) {
+      return p.type === 'conveyorR' ? 2.5 : -2.5;
+    }
+    return v;
+  }, 0) : 0;
+  const accel = onIce ? 0.15 : ACCEL;
+  const fric = onIce ? 0.97 : FRICTION;
+
+  // Horizontal
+  let inputX = 0;
+  if (keys['ArrowLeft'] || keys['KeyA']) inputX = -1;
+  if (keys['ArrowRight'] || keys['KeyD']) inputX = 1;
+  player.vx += inputX * accel + conveyorPush * 0.1;
+  if (!inputX && !conveyorPush) player.vx *= fric;
+  else if (!inputX && conveyorPush) player.vx = player.vx * 0.9 + conveyorPush * 0.15;
+  player.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.vx));
+
+  // Gravity
+  if (player.wallSliding) {
+    player.vy = Math.min(player.vy + GRAVITY * 0.4, WALL_SLIDE_SPEED);
+  } else {
+    player.vy += GRAVITY;
+  }
+  if (player.vy > 14) player.vy = 14;
+
+  // Jump buffer
+  if (keys['Space'] || keys['ArrowUp'] || keys['KeyW']) {
+    player.jumpBuffer = 6;
+  } else {
+    player.jumpBuffer = Math.max(0, player.jumpBuffer - 1);
+  }
+
+  // Coyote time
+  if (player.onGround) {
+    player.coyoteTime = 6;
+  } else {
+    player.coyoteTime = Math.max(0, player.coyoteTime - 1);
+  }
+
+  // Jump
+  if (player.jumpBuffer > 0 && player.coyoteTime > 0) {
+    player.vy = JUMP_FORCE;
+    player.jumpBuffer = 0;
+    player.coyoteTime = 0;
+  }
+
+  // Wall jump
+  if (player.jumpBuffer > 0 && player.wallSliding) {
+    player.vx = WALL_JUMP_FORCE_X * -player.wallDir;
+    player.vy = WALL_JUMP_FORCE_Y;
+    player.jumpBuffer = 0;
+  }
+
+  // Move X
+  player.x += player.vx;
+  player.onGround = false;
+  player.wallSliding = false;
+  player.wallDir = 0;
+
+  // Collide X
+  for (const p of platforms) {
+    if (!p.visible || p.type === 'lava' || p.type === 'checkpoint' || p.type === 'finish' || p.type === 'bounce') continue;
+    if (collides(player, p)) {
+      if (player.vx > 0) {
+        player.x = p.x - player.w;
+        player.wallDir = 1;
+      } else if (player.vx < 0) {
+        player.x = p.x + p.w;
+        player.wallDir = -1;
+      }
+      // Wall slide check
+      if (!player.onGround && player.vy > 0 && inputX !== 0) {
+        player.wallSliding = true;
+      }
+      player.vx = 0;
+    }
+  }
+
+  // Move Y
+  player.y += player.vy;
+
+  // Collide Y
+  for (const p of platforms) {
+    if (!p.visible) continue;
+    if (p.type === 'checkpoint' || p.type === 'finish') continue;
+    if (p.type === 'lava') continue;
+    if (collides(player, p)) {
+      if (p.type === 'bounce' && player.vy > 0) {
+        player.vy = -14;
+        for (let i = 0; i < 8; i++) {
+          particles.push({
+            x: player.x + player.w / 2,
+            y: p.y,
+            vx: (Math.random() - 0.5) * 4,
+            vy: -Math.random() * 5,
+            life: 20,
+            color: '#0f0',
+            size: 3,
+          });
+        }
+        continue;
+      }
+      if (player.vy > 0) {
+        player.y = p.y - player.h;
+        player.onGround = true;
+        // Crumble
+        if (p.type === 'crumble' && !p.crumbling) {
+          p.crumbling = true;
+          p.timer = 30;
+        }
+      } else if (player.vy < 0) {
+        player.y = p.y + p.h;
+      }
+      player.vy = 0;
+    }
+  }
+
+  // Crumble timer
+  for (const p of platforms) {
+    if (p.crumbling) {
+      p.timer--;
+      if (p.timer <= 0) {
+        p.visible = false;
+        setTimeout(() => {
+          p.visible = true;
+          p.crumbling = false;
+        }, 2000);
+      }
+    }
+  }
+
+  // Check lava
+  for (const l of lavaBlocks) {
+    if (collides(player, l)) {
+      die();
+      return;
+    }
+  }
+
+  // Check falling off screen
+  if (player.y > H + 100) {
+    die();
+    return;
+  }
+
+  // Check checkpoints
+  for (const p of platforms) {
+    if ((p.type === 'checkpoint') && collides(player, p)) {
+      player.respawnX = p.x;
+      player.respawnY = p.y - player.h;
+      if (currentStage < stages.length - 1) {
+        loadStage(currentStage + 1);
+        return;
+      }
+    }
+    if (p.type === 'finish' && collides(player, p)) {
+      gameState = 'win';
+    }
+  }
+
+  // Trail
+  player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2 });
+  if (player.trail.length > 12) player.trail.shift();
+
+  // Restart
+  if (keys['KeyR']) {
+    player.x = player.respawnX;
+    player.y = player.respawnY;
+    player.vx = 0;
+    player.vy = 0;
+  }
+}
+
+// --- Camera ---
+function updateCamera() {
+  const targetX = player.x - W / 3;
+  const targetY = player.y - H / 2;
+  cameraX += (targetX - cameraX) * 0.1;
+  cameraY += (targetY - cameraY) * 0.08;
+  cameraY = Math.min(cameraY, 100);
+}
+
+// --- Particles ---
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+// --- Drawing ---
+function drawBg() {
+  // Gradient sky
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a0a2e');
+  grad.addColorStop(1, '#1a1a3e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  const seed = 42;
+  for (let i = 0; i < 60; i++) {
+    const sx = ((seed * (i + 1) * 7) % W);
+    const sy = ((seed * (i + 1) * 13) % (H * 0.6));
+    const brightness = 0.3 + (i % 5) * 0.15;
+    ctx.fillStyle = `rgba(255,255,255,${brightness})`;
+    ctx.fillRect(sx - cameraX * 0.05 % W, sy, 2, 2);
+  }
+
+  // Parallax mountains
+  ctx.fillStyle = '#151530';
+  for (let i = 0; i < 8; i++) {
+    const mx = i * 200 - (cameraX * 0.15) % 1600;
+    ctx.beginPath();
+    ctx.moveTo(mx, H);
+    ctx.lineTo(mx + 100, H - 150 - (i % 3) * 40);
+    ctx.lineTo(mx + 200, H);
+    ctx.fill();
+  }
+}
+
+function drawPlatform(p) {
+  if (!p.visible) return;
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+
+  const colors = {
+    solid: '#556',
+    ice: '#8df',
+    bounce: '#0f0',
+    crumble: p.crumbling ? `rgba(170,140,100,${p.timer / 30})` : '#a80',
+    moving: '#a6f',
+    checkpoint: '#ff0',
+    finish: '#0ff',
+    lava: '#f30',
+    conveyorR: '#e70',
+    conveyorL: '#e70',
+  };
+
+  ctx.fillStyle = colors[p.type] || '#556';
+
+  if (p.type === 'lava') {
+    // Animated lava
+    const t = performance.now() / 300;
+    ctx.fillStyle = '#f30';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = '#f60';
+    for (let i = 0; i < p.w; i += 20) {
+      const yOff = Math.sin(t + i * 0.1) * 4;
+      ctx.fillRect(p.x + i, p.y + yOff, 12, 6);
+    }
+    ctx.fillStyle = 'rgba(255,255,0,0.3)';
+    ctx.fillRect(p.x, p.y, p.w, 3);
+    ctx.restore();
+    return;
+  }
+
+  if (p.type === 'checkpoint' || p.type === 'finish') {
+    // Flag
+    const t = performance.now() / 500;
+    const glow = 0.4 + Math.sin(t) * 0.3;
+    ctx.shadowColor = p.type === 'finish' ? '#0ff' : '#ff0';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = p.type === 'finish'
+      ? `rgba(0,255,255,${glow + 0.3})`
+      : `rgba(255,255,0,${glow + 0.3})`;
+    ctx.fillRect(p.x + 5, p.y - 30, 30, 25);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x + 5, p.y - 30, 3, 50);
+    ctx.restore();
+    return;
+  }
+
+  // Regular platform drawing
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(p.x, p.y, p.w, 3);
+
+  if (p.type === 'ice') {
+    // Ice sparkle
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < p.w; i += 15) {
+      ctx.fillRect(p.x + i + Math.sin(performance.now() / 200 + i) * 3, p.y + 2, 3, 3);
+    }
+  }
+
+  if (p.type === 'bounce') {
+    // Spring visual
+    ctx.fillStyle = '#0a0';
+    ctx.fillRect(p.x + 2, p.y + p.h - 5, p.w - 4, 5);
+    const t = performance.now() / 200;
+    ctx.strokeStyle = '#0f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < p.w - 4; i += 6) {
+      ctx.lineTo(p.x + 2 + i, p.y + (i % 12 < 6 ? 2 : p.h - 7));
+    }
+    ctx.stroke();
+  }
+
+  if (p.type === 'conveyorR' || p.type === 'conveyorL') {
+    // Conveyor belt arrows
+    const dir = p.type === 'conveyorR' ? 1 : -1;
+    const t = (performance.now() / 150 * dir) % 20;
+    ctx.fillStyle = '#fc0';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    for (let i = -20; i < p.w + 20; i += 20) {
+      const ax = p.x + ((i + t * dir + 200) % (p.w + 10)) - 5;
+      if (ax >= p.x && ax <= p.x + p.w - 8) {
+        ctx.fillText(dir > 0 ? '>>>' : '<<<', ax + 4, p.y + p.h - 3);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawPlayer() {
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+
+  // Trail
+  for (let i = 0; i < player.trail.length; i++) {
+    const t = player.trail[i];
+    const alpha = i / player.trail.length * 0.3;
+    ctx.fillStyle = `rgba(70,170,255,${alpha})`;
+    const size = (i / player.trail.length) * player.w * 0.6;
+    ctx.fillRect(t.x - size / 2, t.y - size / 2, size, size);
+  }
+
+  // Body
+  ctx.fillStyle = player.color;
+  ctx.shadowColor = '#4af';
+  ctx.shadowBlur = 10;
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.shadowBlur = 0;
+
+  // Eyes
+  const eyeDir = player.vx > 0.3 ? 2 : player.vx < -0.3 ? -2 : 0;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(player.x + 4 + eyeDir, player.y + 6, 5, 6);
+  ctx.fillRect(player.x + 12 + eyeDir, player.y + 6, 5, 6);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(player.x + 6 + eyeDir, player.y + 8, 2, 3);
+  ctx.fillRect(player.x + 14 + eyeDir, player.y + 8, 2, 3);
+
+  // Wall slide indicator
+  if (player.wallSliding) {
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(
+        player.x + (player.wallDir > 0 ? player.w + 2 : -6),
+        player.y + 5 + i * 8,
+        4, 4
+      );
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawParticles() {
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / 40;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawTextPopups() {
+  for (let i = textPopups.length - 1; i >= 0; i--) {
+    const t = textPopups[i];
+    t.life--;
+    if (t.life <= 0) { textPopups.splice(i, 1); continue; }
+    const alpha = Math.min(1, t.life / 30);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 10;
+    ctx.fillText(t.text, t.x, t.y + (1 - alpha) * -20);
+    ctx.restore();
+  }
+}
+
+function drawWin() {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#0ff';
+  ctx.font = 'bold 56px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#0ff';
+  ctx.shadowBlur = 30;
+  ctx.fillText('YOU WIN!', W / 2, H / 2 - 40);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px "Segoe UI", sans-serif';
+  ctx.fillText(`Deaths: ${deaths}  |  Time: ${elapsed.toFixed(1)}s`, W / 2, H / 2 + 20);
+  ctx.fillStyle = '#aaa';
+  ctx.font = '18px "Segoe UI", sans-serif';
+  ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 70);
+
+  if (keys['Space']) {
+    deaths = 0;
+    elapsed = 0;
+    startTime = performance.now();
+    loadStage(0);
+    gameState = 'playing';
+  }
+}
+
+// --- Main Loop ---
+function loop() {
+  requestAnimationFrame(loop);
+
+  if (gameState === 'menu') {
+    drawBg();
+    return;
+  }
+
+  if (gameState === 'playing') {
+    elapsed = (performance.now() - startTime) / 1000;
+    document.getElementById('timer').textContent = elapsed.toFixed(1);
+    updateMoving();
+    updatePlayer();
+    updateCamera();
+    updateParticles();
+  }
+
+  drawBg();
+  for (const l of lavaBlocks) drawPlatform(l);
+  for (const p of platforms) drawPlatform(p);
+  drawParticles();
+  drawPlayer();
+  drawTextPopups();
+
+  if (gameState === 'win') drawWin();
+}
+
+// --- Start ---
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('ui').classList.remove('hidden');
+  gameState = 'playing';
+  startTime = performance.now();
+  loadStage(0);
+});
+
+loop();
+</script>
+</body>
+</html>

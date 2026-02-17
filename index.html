@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Arcade</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+  }
+  h1 {
+    font-size: 48px;
+    letter-spacing: 6px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 30px #f06, 0 0 60px #f06;
+  }
+  p.sub { color: #888; margin-bottom: 50px; font-size: 16px; }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    max-width: 900px;
+    width: 100%;
+  }
+  .card {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid #333;
+    border-radius: 16px;
+    padding: 30px;
+    text-decoration: none;
+    color: #fff;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    display: block;
+  }
+  .card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 40px rgba(255,50,100,0.2);
+    border-color: #f06;
+  }
+  .card h2 { font-size: 28px; margin-bottom: 8px; }
+  .card .tag {
+    display: inline-block;
+    background: rgba(255,255,255,0.1);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 12px;
+  }
+  .card p { color: #999; font-size: 14px; line-height: 1.6; }
+  .card .emoji { font-size: 48px; margin-bottom: 12px; }
+  .obby h2 { color: #4af; }
+  .fighter h2 { color: #f44; }
+</style>
+</head>
+<body>
+  <h1>GAME ARCADE</h1>
+  <p class="sub">Pick a game and play!</p>
+  <div class="games">
+    <a href="obby/" class="card obby">
+      <div class="emoji">🏃</div>
+      <h2>OBBY</h2>
+      <span class="tag">Platformer</span>
+      <p>20-stage obstacle course with wall jumps, ice, bounce pads, conveyor belts, crumbling platforms, and more. Stages 11-20 are HARD MODE.</p>
+    </a>
+    <a href="street-fighter/" class="card fighter">
+      <div class="emoji">🥊</div>
+      <h2>STREET BRAWL</h2>
+      <span class="tag">2P Fighting</span>
+      <p>2-player fighting game. Ryu vs Ken with punches, kicks, hadoukens, shoryukens, combos, and special meters. Best of 3 rounds.</p>
+    </a>
+  </div>
+</body>
+</html>
