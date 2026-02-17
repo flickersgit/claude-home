@@ -15,7 +15,60 @@
     overflow: hidden;
     font-family: 'Segoe UI', sans-serif;
   }
-  canvas { border-radius: 4px; }
+  canvas { border-radius: 4px; touch-action: none; }
+
+  /* Virtual controls - only on touch devices */
+  #touch-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    pointer-events: none;
+    z-index: 20;
+  }
+  @media (pointer: coarse) {
+    #touch-controls { display: block; }
+  }
+  #touch-controls .dpad,
+  #touch-controls .action-btns {
+    position: absolute;
+    bottom: 20px;
+    pointer-events: auto;
+  }
+  #touch-controls .dpad { left: 20px; }
+  #touch-controls .action-btns { right: 20px; }
+  .touch-btn {
+    position: absolute;
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 2.5px solid rgba(255,255,255,0.5);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: auto;
+  }
+  .touch-btn:active, .touch-btn.pressed {
+    background: rgba(255,255,255,0.3);
+  }
+  /* D-pad layout: cross pattern */
+  .dpad .touch-btn.up    { left: 55px; top: 0; border-color: #fff; }
+  .dpad .touch-btn.left  { left: 0; top: 55px; border-color: #fff; }
+  .dpad .touch-btn.right { left: 110px; top: 55px; border-color: #fff; }
+  .dpad .touch-btn.down  { left: 55px; top: 110px; border-color: #fff; }
+  /* Action buttons: 2x2 grid */
+  .action-btns .touch-btn.punch   { left: 0; top: 0; border-color: #f44; color: #f44; }
+  .action-btns .touch-btn.kick    { left: 65px; top: 0; border-color: #f80; color: #f80; }
+  .action-btns .touch-btn.special { left: 0; top: 65px; border-color: #48f; color: #48f; }
+  .action-btns .touch-btn.block   { left: 65px; top: 65px; border-color: #fff; color: #fff; }
   #overlay {
     position: absolute;
     z-index: 10;
@@ -48,6 +101,17 @@
     text-align: center;
   }
   #overlay .ctrl-box h3 { color: #fff; font-size: 16px; margin-bottom: 6px; }
+  @media (pointer: coarse) {
+    #overlay .controls { display: none !important; }
+    #overlay .touch-info { display: block; }
+  }
+  #overlay .touch-info {
+    display: none;
+    color: #aaa;
+    font-size: 15px;
+    text-align: center;
+    line-height: 1.8;
+  }
   #overlay .ctrl-box .p1 { color: #4af; }
   #overlay .ctrl-box .p2 { color: #f44; }
   #overlay button {
@@ -90,16 +154,80 @@
       <b>O</b> &mdash; Block
     </div>
   </div>
+  <div class="touch-info">
+    <b>Player 1 vs CPU</b><br>
+    D-pad (left) &mdash; Move / Jump / Crouch<br>
+    Buttons (right) &mdash; Punch / Kick / Special / Block
+  </div>
   <button id="startBtn">FIGHT!</button>
 </div>
 
 <canvas id="game"></canvas>
+
+<div id="touch-controls">
+  <div class="dpad">
+    <div class="touch-btn up" data-key="KeyW">&uarr;</div>
+    <div class="touch-btn left" data-key="KeyA">&larr;</div>
+    <div class="touch-btn right" data-key="KeyD">&rarr;</div>
+    <div class="touch-btn down" data-key="KeyS">&darr;</div>
+  </div>
+  <div class="action-btns">
+    <div class="touch-btn punch" data-key="KeyF">P</div>
+    <div class="touch-btn kick" data-key="KeyG">K</div>
+    <div class="touch-btn special" data-key="KeyH">SP</div>
+    <div class="touch-btn block" data-key="KeyT">BL</div>
+  </div>
+</div>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 1024, H = 576;
 canvas.width = W; canvas.height = H;
+
+// ---- Responsive Canvas ----
+function resizeCanvas() {
+  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ---- Touch Device Detection ----
+const isTouchDevice = 'ontouchstart' in window;
+
+// ---- Touch Controls ----
+(function setupTouchControls() {
+  const btns = document.querySelectorAll('.touch-btn[data-key]');
+  btns.forEach(btn => {
+    const keyCode = btn.getAttribute('data-key');
+    btn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      keys[keyCode] = true;
+      btn.classList.add('pressed');
+    }, { passive: false });
+    btn.addEventListener('touchend', e => {
+      e.preventDefault();
+      keys[keyCode] = false;
+      btn.classList.remove('pressed');
+    }, { passive: false });
+    btn.addEventListener('touchcancel', e => {
+      e.preventDefault();
+      keys[keyCode] = false;
+      btn.classList.remove('pressed');
+    }, { passive: false });
+  });
+})();
+
+// ---- Touch Restart ----
+let touchRestart = false;
+canvas.addEventListener('touchstart', e => {
+  if (gameState === 'matchEnd') {
+    e.preventDefault();
+    touchRestart = true;
+  }
+}, { passive: false });
 
 // ---- Constants ----
 const GROUND = H - 80;
@@ -962,6 +1090,19 @@ function loop() {
     punch: keys['KeyK'], kick: keys['KeyL'], special: keys['Semicolon'], block: keys['KeyO'],
   };
 
+  // CPU AI for P2 on touch devices
+  if (isTouchDevice && gameState === 'fighting') {
+    const dist = Math.abs(p1.x - p2.x);
+    p2ctrl.left = p2.x > p1.x && dist > 80;
+    p2ctrl.right = p2.x < p1.x && dist > 80;
+    p2ctrl.punch = dist < 100 && Math.random() < 0.05;
+    p2ctrl.kick = dist < 120 && Math.random() < 0.04;
+    p2ctrl.special = dist < 150 && Math.random() < 0.01 && p2.special >= 30;
+    p2ctrl.block = dist < 100 && Math.random() < 0.03;
+    p2ctrl.up = Math.random() < 0.005;
+    p2ctrl.down = false;
+  }
+
   if (gameState === 'fighting') {
     updateFighter(p1, p2, p1ctrl);
     updateFighter(p2, p1, p2ctrl);
@@ -984,7 +1125,8 @@ function loop() {
   }
 
   if (gameState === 'matchEnd') {
-    if (keys['Space']) {
+    if (keys['Space'] || touchRestart) {
+      touchRestart = false;
       p1Wins = 0; p2Wins = 0; currentRound = 1;
       startRound();
     }
@@ -1011,7 +1153,7 @@ function loop() {
     ctx.fillStyle = '#aaa';
     ctx.font = '18px "Segoe UI"';
     ctx.textAlign = 'center';
-    ctx.fillText('Press SPACE to rematch', W / 2, H - 20);
+    ctx.fillText(isTouchDevice ? 'Tap to rematch' : 'Press SPACE to rematch', W / 2, H - 20);
   }
 }
 

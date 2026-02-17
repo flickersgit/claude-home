@@ -19,6 +19,49 @@
     border: 2px solid #333;
     border-radius: 8px;
     image-rendering: pixelated;
+    touch-action: none;
+  }
+  /* Mobile touch controls */
+  #touch-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 160px;
+    z-index: 30;
+    pointer-events: none;
+  }
+  #touch-controls button {
+    position: absolute;
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    font-size: 24px;
+    font-weight: bold;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #touch-controls button:active {
+    background: rgba(255,255,255,0.35);
+  }
+  #btn-left { bottom: 20px; left: 20px; }
+  #btn-right { bottom: 20px; left: 100px; }
+  #btn-jump { bottom: 20px; right: 20px; width: 80px; height: 80px; font-size: 16px; }
+  #btn-restart { bottom: 115px; right: 28px; width: 50px; height: 50px; font-size: 12px; }
+  @media (pointer: coarse) {
+    #touch-controls { display: block; }
+    #controls { display: none; }
   }
   #ui {
     position: absolute;
@@ -101,6 +144,13 @@
 
 <canvas id="game"></canvas>
 
+<div id="touch-controls">
+  <button id="btn-left">&#9664;</button>
+  <button id="btn-right">&#9654;</button>
+  <button id="btn-jump">JUMP</button>
+  <button id="btn-restart">R</button>
+</div>
+
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -115,10 +165,40 @@ let elapsed = 0;
 let currentStage = 0;
 let cameraX = 0, cameraY = 0;
 
+// --- Responsive Canvas ---
+function resizeCanvas() {
+  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
 // --- Input ---
 const keys = {};
 window.addEventListener('keydown', e => { keys[e.code] = true; if (['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault(); });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// --- Touch Controls ---
+function bindTouch(btnId, keyCode) {
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); keys[keyCode] = true; }, { passive: false });
+  btn.addEventListener('touchend', e => { e.preventDefault(); keys[keyCode] = false; }, { passive: false });
+  btn.addEventListener('touchcancel', e => { keys[keyCode] = false; });
+}
+bindTouch('btn-left', 'ArrowLeft');
+bindTouch('btn-right', 'ArrowRight');
+bindTouch('btn-jump', 'Space');
+bindTouch('btn-restart', 'KeyR');
+
+// Tap canvas to restart on win screen
+let winTapRestart = false;
+canvas.addEventListener('touchstart', e => {
+  if (gameState === 'win') {
+    e.preventDefault();
+    winTapRestart = true;
+  }
+}, { passive: false });
 
 // --- Player ---
 const player = {
@@ -1074,9 +1154,10 @@ function drawWin() {
   ctx.fillText(`Deaths: ${deaths}  |  Time: ${elapsed.toFixed(1)}s`, W / 2, H / 2 + 20);
   ctx.fillStyle = '#aaa';
   ctx.font = '18px "Segoe UI", sans-serif';
-  ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 70);
+  ctx.fillText('Press SPACE or tap to play again', W / 2, H / 2 + 70);
 
-  if (keys['Space']) {
+  if (keys['Space'] || winTapRestart) {
+    winTapRestart = false;
     deaths = 0;
     elapsed = 0;
     startTime = performance.now();

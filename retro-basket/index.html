@@ -6,19 +6,50 @@
 <title>RETRO SHOOTOUT - MJ vs Curry</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:'Courier New',monospace}
-canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px}
+body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:'Courier New',monospace;flex-direction:column}
+canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#touch-controls{display:none;position:fixed;bottom:0;left:0;width:100%;pointer-events:none;z-index:10;padding:10px;box-sizing:border-box}
+#touch-controls.active{display:flex;justify-content:space-between;align-items:flex-end}
+.touch-btn{pointer-events:auto;min-width:56px;min-height:56px;border:2px solid rgba(255,255,255,0.5);border-radius:12px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Courier New',monospace;font-size:13px;font-weight:bold;text-align:center;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none;-webkit-user-select:none;transition:background 0.1s}
+.touch-btn:active,.touch-btn.pressed{background:rgba(255,255,0,0.35);border-color:#ff0}
+.touch-btn-group{display:flex;gap:8px;flex-direction:column;align-items:center}
+.touch-btn-row{display:flex;gap:8px}
+#btn-action{min-width:80px;min-height:80px;font-size:15px;border-radius:50%;background:rgba(255,200,0,0.18);border-color:rgba(255,200,0,0.6)}
+#btn-up,#btn-down{min-width:56px;min-height:56px}
+#btn-mute{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:8px;right:8px;border-radius:8px;pointer-events:auto;z-index:11}
+#btn-back{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:8px;left:8px;border-radius:8px;pointer-events:auto;z-index:11}
+@media (pointer:coarse){
+  #touch-controls{display:flex;justify-content:space-between;align-items:flex-end}
+  #btn-mute,#btn-back{display:flex}
+}
+@media (pointer:fine){
+  #touch-controls{display:none!important}
+  #btn-mute,#btn-back{display:none!important}
+}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<!-- Touch controls for mobile -->
+<button class="touch-btn" id="btn-back" style="display:none">ESC</button>
+<button class="touch-btn" id="btn-mute" style="display:none">M</button>
+<div id="touch-controls">
+  <div class="touch-btn-group">
+    <button class="touch-btn" id="btn-up">&#9650;</button>
+    <button class="touch-btn" id="btn-down">&#9660;</button>
+  </div>
+  <button class="touch-btn" id="btn-action">SHOOT</button>
+</div>
 <script>
 const C=document.getElementById('game'),X=C.getContext('2d');
 const W=800,H=600;
 C.width=W;C.height=H;
+const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
 function resize(){
-  const s=Math.min(window.innerWidth/W,window.innerHeight/H)*0.95;
+  // Reserve space for touch controls on mobile (approx 100px at bottom)
+  const availH=isTouchDevice?window.innerHeight-110:window.innerHeight;
+  const s=Math.min(window.innerWidth/W,availH/H)*0.95;
   C.style.width=W*s+'px';C.style.height=H*s+'px';
 }
 resize();window.addEventListener('resize',resize);
@@ -1412,7 +1443,7 @@ function drawHUD(){
   X.fillStyle=musicMuted?'#666':'#0f0';
   X.font='10px Courier New';
   X.textAlign='right';
-  X.fillText(musicMuted?'[M] MUSIC OFF':'[M] MUSIC ON',W-10,H-10);
+  if(!isTouchDevice) X.fillText(musicMuted?'[M] MUSIC OFF':'[M] MUSIC ON',W-10,H-10);
 }
 
 function drawCrowd(){
@@ -1495,7 +1526,7 @@ function drawMenu(){
   // Controls
   X.fillStyle='#555';
   X.font='11px Courier New';
-  X.fillText('[UP/DOWN] Select   [SPACE/ENTER] Start   [M] Music On/Off',W/2,H-20);
+  X.fillText(isTouchDevice?'Use buttons below to play':'[UP/DOWN] Select   [SPACE/ENTER] Start   [M] Music On/Off',W/2,H-20);
 }
 
 let menuSel=0;
@@ -1551,11 +1582,11 @@ function drawResult(){
   X.fillStyle='#ff0';
   X.font='bold 16px Courier New';
   const blink=Math.sin(Date.now()/300)>0;
-  if(blink) X.fillText('[ PRESS SPACE TO PLAY AGAIN ]',W/2,500);
+  if(blink) X.fillText(isTouchDevice?'[ TAP TO PLAY AGAIN ]':'[ PRESS SPACE TO PLAY AGAIN ]',W/2,500);
 
   X.fillStyle='#666';
   X.font='11px Courier New';
-  X.fillText('[ESC] Back to Menu',W/2,530);
+  X.fillText(isTouchDevice?'Use ESC button for Menu':'[ESC] Back to Menu',W/2,530);
 }
 
 // Main update
@@ -1826,12 +1857,12 @@ function render(){
     X.fillStyle='#aaa';
     X.font='12px Courier New';
     X.textAlign='center';
-    X.fillText('Press SPACE to set angle',W/2,H-20);
+    X.fillText(isTouchDevice?'Tap to set angle':'Press SPACE to set angle',W/2,H-20);
   } else if(shotPhase==='power'){
     X.fillStyle='#aaa';
     X.font='12px Courier New';
     X.textAlign='center';
-    X.fillText('Press SPACE to set power (aim for green zone!)',W/2,H-20);
+    X.fillText(isTouchDevice?'Tap to set power (aim for green zone!)':'Press SPACE to set power (aim for green zone!)',W/2,H-20);
   }
 }
 
@@ -1840,6 +1871,7 @@ function gameLoop(ts){
   lastTime=ts;
   update(dt);
   render();
+  if(typeof updateTouchUI==='function') updateTouchUI();
   requestAnimationFrame(gameLoop);
 }
 
@@ -1899,6 +1931,88 @@ document.addEventListener('keydown',e=>{
   // Global mute toggle
   if(state==='menu'&&e.code==='KeyM') toggleMusic();
 });
+
+// ==================== TOUCH CONTROLS ====================
+// isTouchDevice declared earlier near canvas setup
+const touchControls=document.getElementById('touch-controls');
+const btnAction=document.getElementById('btn-action');
+const btnUp=document.getElementById('btn-up');
+const btnDown=document.getElementById('btn-down');
+const btnMute=document.getElementById('btn-mute');
+const btnBack=document.getElementById('btn-back');
+
+if(isTouchDevice){
+  touchControls.classList.add('active');
+  btnMute.style.display='flex';
+  btnBack.style.display='flex';
+}
+
+// Simulate keydown event for reuse
+function simulateKey(code){
+  document.dispatchEvent(new KeyboardEvent('keydown',{code:code,bubbles:true}));
+}
+
+// Update touch button labels based on game state
+function updateTouchUI(){
+  if(!isTouchDevice) return;
+  if(state==='menu'){
+    btnAction.textContent='START';
+    btnUp.style.visibility='visible';
+    btnDown.style.visibility='visible';
+  } else if(state==='playing'){
+    btnUp.style.visibility='hidden';
+    btnDown.style.visibility='hidden';
+    if(shotPhase==='aim') btnAction.textContent='AIM';
+    else if(shotPhase==='power') btnAction.textContent='POWER';
+    else btnAction.textContent='...';
+  } else if(state==='result'){
+    btnAction.textContent='AGAIN';
+    btnUp.style.visibility='hidden';
+    btnDown.style.visibility='hidden';
+  }
+  btnMute.textContent=musicMuted?'ON':'OFF';
+  btnMute.style.borderColor=musicMuted?'rgba(255,255,255,0.3)':'rgba(0,255,0,0.6)';
+}
+
+// Helper: prevent default and add pressed visual
+function touchBtn(el,code){
+  el.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    el.classList.add('pressed');
+    simulateKey(code);
+  },{passive:false});
+  el.addEventListener('touchend',function(e){
+    e.preventDefault();
+    el.classList.remove('pressed');
+  },{passive:false});
+  el.addEventListener('touchcancel',function(e){
+    el.classList.remove('pressed');
+  });
+  // Prevent mouse click double-fire on touch
+  el.addEventListener('click',function(e){e.preventDefault();});
+}
+
+touchBtn(btnAction,'Space');
+touchBtn(btnUp,'ArrowUp');
+touchBtn(btnDown,'ArrowDown');
+touchBtn(btnMute,'KeyM');
+touchBtn(btnBack,'Escape');
+
+// Prevent default on canvas touches to stop scrolling / zooming
+// Tap on canvas also acts as Space (main action)
+C.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  AC.resume();
+  simulateKey('Space');
+},{passive:false});
+C.addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
+C.addEventListener('touchend',function(e){e.preventDefault();},{passive:false});
+
+// Also handle first touch to start audio (like click handler)
+C.addEventListener('touchstart',function startAudioTouch(){
+  AC.resume().then(function(){if(state==='menu')playMenuMusic();});
+  C.removeEventListener('touchstart',startAudioTouch);
+},{passive:false});
 
 // Init
 initCrowd();

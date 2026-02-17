@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>GALACTIC DEFENDER - Retro Shooter</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -15,7 +15,7 @@ body {
   overflow: hidden;
   font-family: 'Courier New', monospace;
 }
-canvas { display: block; image-rendering: pixelated; }
+canvas { display: block; image-rendering: pixelated; touch-action: none; }
 #ui {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -82,6 +82,114 @@ h2 {
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 #finalScore { font-size: 24px; color: #ff0; text-shadow: 0 0 10px #ff0; margin: 10px 0; }
 #finalWave { font-size: 18px; color: #0ff; margin-bottom: 20px; }
+
+/* Mobile touch controls */
+#touchControls {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 160px;
+  pointer-events: none;
+  z-index: 30;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#touchControls .touch-btn {
+  position: absolute;
+  pointer-events: all;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  font-family: 'Courier New', monospace;
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+#touchControls .touch-btn.active {
+  background: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.7);
+}
+/* D-pad buttons - left side */
+#btn-left {
+  left: 16px;
+  bottom: 50px;
+  width: 64px;
+  height: 64px;
+}
+#btn-right {
+  left: 96px;
+  bottom: 50px;
+  width: 64px;
+  height: 64px;
+}
+#btn-up {
+  left: 56px;
+  bottom: 120px;
+  width: 64px;
+  height: 64px;
+}
+#btn-down {
+  left: 56px;
+  bottom: -20px;
+  width: 64px;
+  height: 64px;
+  display: none; /* hide down by default, less useful in shooters */
+}
+/* Action buttons - right side */
+#btn-fire {
+  right: 16px;
+  bottom: 50px;
+  width: 80px;
+  height: 80px;
+  border-color: rgba(0,255,255,0.5);
+  color: rgba(0,255,255,0.8);
+  font-size: 14px;
+}
+#btn-bomb {
+  right: 110px;
+  bottom: 70px;
+  width: 60px;
+  height: 60px;
+  border-color: rgba(255,100,0,0.5);
+  color: rgba(255,100,0,0.8);
+  font-size: 12px;
+}
+#btn-pause {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+  z-index: 31;
+  pointer-events: all;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.6);
+  font-family: 'Courier New', monospace;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+@media (pointer: coarse) {
+  #touchControls { display: block; }
+  #btn-pause { display: flex; }
+  #hud { font-size: 13px; padding: 8px 12px; }
+  .controls { display: none; }
+  .blink { font-size: 18px; padding: 16px 24px; }
+}
 </style>
 </head>
 <body>
@@ -105,15 +213,24 @@ h2 {
     [X] Bomb (1 per wave)<br>
     [P] Pause
   </div>
-  <div class="blink" onclick="startGame()">[ PRESS SPACE TO START ]</div>
+  <div class="blink" onclick="startGame()">[ TAP TO START ]</div>
 </div>
 
 <div id="gameOverScreen">
   <h2>GAME OVER</h2>
   <div id="finalScore">SCORE: 0</div>
   <div id="finalWave">WAVE: 1</div>
-  <div class="blink" onclick="startGame()">[ PRESS SPACE TO RETRY ]</div>
+  <div class="blink" onclick="startGame()">[ TAP TO RETRY ]</div>
 </div>
+
+<div id="touchControls">
+  <div id="btn-left" class="touch-btn">&larr;</div>
+  <div id="btn-right" class="touch-btn">&rarr;</div>
+  <div id="btn-up" class="touch-btn">&uarr;</div>
+  <div id="btn-fire" class="touch-btn">FIRE</div>
+  <div id="btn-bomb" class="touch-btn">BOMB</div>
+</div>
+<div id="btn-pause" class="touch-btn">| |</div>
 
 <script>
 const canvas = document.getElementById('game');
@@ -819,6 +936,100 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Mobile touch controls
+(function() {
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  if (!isTouchDevice) return;
+
+  // Map touch buttons to key codes used by the game
+  const btnKeyMap = {
+    'btn-left':  'ArrowLeft',
+    'btn-right': 'ArrowRight',
+    'btn-up':    'ArrowUp',
+    'btn-fire':  'Space',
+  };
+
+  // Set up hold-style buttons (movement + fire)
+  Object.keys(btnKeyMap).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const keyCode = btnKeyMap[id];
+
+    el.addEventListener('touchstart', e => {
+      e.preventDefault();
+      keys[keyCode] = true;
+      el.classList.add('active');
+    }, { passive: false });
+
+    el.addEventListener('touchend', e => {
+      e.preventDefault();
+      keys[keyCode] = false;
+      el.classList.remove('active');
+    }, { passive: false });
+
+    el.addEventListener('touchcancel', e => {
+      e.preventDefault();
+      keys[keyCode] = false;
+      el.classList.remove('active');
+    }, { passive: false });
+  });
+
+  // Bomb button - single press action
+  const btnBomb = document.getElementById('btn-bomb');
+  if (btnBomb) {
+    btnBomb.addEventListener('touchstart', e => {
+      e.preventDefault();
+      btnBomb.classList.add('active');
+      if (state === 'playing') useBomb();
+    }, { passive: false });
+    btnBomb.addEventListener('touchend', e => {
+      e.preventDefault();
+      btnBomb.classList.remove('active');
+    }, { passive: false });
+    btnBomb.addEventListener('touchcancel', e => {
+      e.preventDefault();
+      btnBomb.classList.remove('active');
+    }, { passive: false });
+  }
+
+  // Pause button
+  const btnPause = document.getElementById('btn-pause');
+  if (btnPause) {
+    btnPause.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (state === 'playing' || state === 'paused') {
+        state = state === 'paused' ? 'playing' : 'paused';
+      }
+    }, { passive: false });
+  }
+
+  // Prevent default on canvas touch to stop scrolling/zooming
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+  // Also handle touch on start/gameover screens
+  document.getElementById('startScreen').addEventListener('touchstart', e => {
+    if (state === 'menu') {
+      e.preventDefault();
+      startGame();
+    }
+  }, { passive: false });
+
+  document.getElementById('gameOverScreen').addEventListener('touchstart', e => {
+    if (state === 'gameover') {
+      e.preventDefault();
+      startGame();
+    }
+  }, { passive: false });
+
+  // Handle multi-touch: if finger slides off a button, release it
+  // This ensures clean state when fingers move between buttons
+  document.addEventListener('touchmove', e => {
+    // For each active touch, check if still over its original button
+    // Not strictly needed but prevents stuck keys in edge cases
+  }, { passive: true });
+})();
 
 // Start
 initStars();
