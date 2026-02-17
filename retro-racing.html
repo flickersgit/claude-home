@@ -73,22 +73,33 @@
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
   }
-  #mobileControls {
-    position: absolute; bottom: 20px; left: 0; width: 100%;
-    display: none; justify-content: space-between; padding: 0 30px;
-    z-index: 5;
+  #joystick {
+    position: absolute; bottom: 30px;
+    left: 50%; transform: translateX(-50%);
+    z-index: 5; touch-action: none;
   }
-  .mBtn {
-    width: 70px; height: 70px; border-radius: 50%;
-    background: rgba(51,255,51,0.15); border: 2px solid rgba(51,255,51,0.4);
-    color: #33ff33; font-size: 28px; display: flex;
-    justify-content: center; align-items: center;
-    user-select: none; -webkit-user-select: none;
-    touch-action: manipulation;
+  #joystickBase {
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(51,255,51,0.08);
+    border: 2px solid rgba(51,255,51,0.25);
+    box-shadow: 0 0 15px rgba(51,255,51,0.05), inset 0 0 15px rgba(51,255,51,0.03);
+    position: relative;
+    display: flex; justify-content: center; align-items: center;
+    cursor: pointer;
   }
-  .mBtn:active { background: rgba(51,255,51,0.35); }
-  @media (pointer: coarse) {
-    #mobileControls { display: flex; }
+  #joystickKnob {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, rgba(51,255,51,0.45), rgba(51,255,51,0.2));
+    border: 2px solid rgba(51,255,51,0.6);
+    box-shadow: 0 0 10px rgba(51,255,51,0.3);
+    position: absolute;
+    pointer-events: none;
+  }
+  #joystickBase::after {
+    content: '+'; position: absolute;
+    color: rgba(51,255,51,0.15); font-size: 60px;
+    font-family: 'Courier New', monospace; font-weight: 100;
+    pointer-events: none;
   }
 </style>
 </head>
@@ -104,16 +115,15 @@
   <div id="overlay">
     <h1>RETRO RACING</h1>
     <h2>TURBO EDITION</h2>
-    <div class="info">Arrow Keys / WASD to steer</div>
-    <div class="info">Hold UP to accelerate</div>
+    <div class="info">Use Joystick to steer & accelerate</div>
+    <div class="info">Push UP to go, DOWN to brake</div>
     <div class="info">Avoid traffic & collect fuel</div>
     <button class="start-btn" id="startBtn">START</button>
   </div>
-  <div id="mobileControls">
-    <div class="mBtn" id="btnLeft">&#9664;</div>
-    <div class="mBtn" id="btnUp">&#9650;</div>
-    <div class="mBtn" id="btnDown">&#9660;</div>
-    <div class="mBtn" id="btnRight">&#9654;</div>
+  <div id="joystick">
+    <div id="joystickBase">
+      <div id="joystickKnob"></div>
+    </div>
   </div>
 </div>
 
@@ -177,16 +187,37 @@ const keys = {};
 window.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-// Mobile controls
-function setupMobile(id, key) {
-  const el = document.getElementById(id);
-  el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
-  el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+// Joystick
+const joystickBase = document.getElementById('joystickBase');
+const joystickKnob = document.getElementById('joystickKnob');
+let joystickX = 0, joystickY = 0, joystickActive = false;
+const jBaseR = 65, jKnobR = 26, jMaxDist = jBaseR - jKnobR;
+
+function updateKnobPos() {
+  joystickKnob.style.transform = `translate(${joystickX * jMaxDist}px, ${joystickY * jMaxDist}px)`;
 }
-setupMobile('btnLeft', 'ArrowLeft');
-setupMobile('btnRight', 'ArrowRight');
-setupMobile('btnUp', 'ArrowUp');
-setupMobile('btnDown', 'ArrowDown');
+function handleJoystick(cx, cy) {
+  const rect = joystickBase.getBoundingClientRect();
+  let dx = cx - (rect.left + rect.width / 2);
+  let dy = cy - (rect.top + rect.height / 2);
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > jMaxDist) { dx = dx / dist * jMaxDist; dy = dy / dist * jMaxDist; }
+  joystickX = dx / jMaxDist;
+  joystickY = dy / jMaxDist;
+  updateKnobPos();
+}
+function resetJoystick() {
+  joystickX = 0; joystickY = 0; joystickActive = false;
+  updateKnobPos();
+}
+
+joystickBase.addEventListener('touchstart', e => { e.preventDefault(); joystickActive = true; handleJoystick(e.touches[0].clientX, e.touches[0].clientY); });
+document.addEventListener('touchmove', e => { if (joystickActive) { e.preventDefault(); handleJoystick(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
+document.addEventListener('touchend', () => { if (joystickActive) resetJoystick(); });
+
+joystickBase.addEventListener('mousedown', e => { e.preventDefault(); joystickActive = true; handleJoystick(e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => { if (joystickActive) handleJoystick(e.clientX, e.clientY); });
+document.addEventListener('mouseup', () => { if (joystickActive) resetJoystick(); });
 
 // Enemies
 let enemies = [];
@@ -633,8 +664,8 @@ function showOverlay(title, finalScore) {
   overlay.innerHTML = `
     <h1>${title}</h1>
     ${finalScore !== undefined ? `<div class="score-display">SCORE: ${finalScore}</div>` : '<h2>TURBO EDITION</h2>'}
-    <div class="info">Arrow Keys / WASD to steer</div>
-    <div class="info">Hold UP to accelerate</div>
+    <div class="info">Use Joystick to steer & accelerate</div>
+    <div class="info">Push UP to go, DOWN to brake</div>
     <div class="info">Avoid traffic & collect fuel</div>
     <button class="start-btn" id="startBtn">${finalScore !== undefined ? 'RETRY' : 'START'}</button>
   `;
@@ -659,29 +690,35 @@ function update() {
     nightTimer = 0;
   }
 
-  // Input
-  const left = keys['ArrowLeft'] || keys['a'] || keys['A'];
-  const right = keys['ArrowRight'] || keys['d'] || keys['D'];
-  const up = keys['ArrowUp'] || keys['w'] || keys['W'];
-  const down = keys['ArrowDown'] || keys['s'] || keys['S'];
+  // Input (joystick analog + keyboard digital)
+  const dz = 0.15;
+  const jx = Math.abs(joystickX) > dz ? joystickX : 0;
+  const jy = Math.abs(joystickY) > dz ? joystickY : 0;
+  let inputX = jx, inputY = jy;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) inputX = -1;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) inputX = 1;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) inputY = -1;
+  if (keys['ArrowDown'] || keys['s'] || keys['S']) inputY = 1;
 
   // Acceleration
-  if (up) {
-    speed = Math.min(speed + 0.15, maxSpeed);
-  } else if (down) {
-    speed = Math.max(speed - 0.2, 0);
+  if (inputY < -dz) {
+    speed = Math.min(speed + 0.15 * Math.abs(inputY), maxSpeed);
+  } else if (inputY > dz) {
+    speed = Math.max(speed - 0.2 * Math.abs(inputY), 0);
   } else {
     speed = Math.max(speed - 0.05, 0);
   }
 
   // Steering
   const steerSpeed = 4.5;
-  if (left) {
-    player.vx = Math.max(player.vx - 0.6, -steerSpeed);
-    player.tilt = Math.max(player.tilt - 0.5, -3);
-  } else if (right) {
-    player.vx = Math.min(player.vx + 0.6, steerSpeed);
-    player.tilt = Math.min(player.tilt + 0.5, 3);
+  if (inputX < -dz) {
+    const amt = Math.abs(inputX);
+    player.vx = Math.max(player.vx - 0.6 * amt, -steerSpeed);
+    player.tilt = Math.max(player.tilt - 0.5 * amt, -3);
+  } else if (inputX > dz) {
+    const amt = Math.abs(inputX);
+    player.vx = Math.min(player.vx + 0.6 * amt, steerSpeed);
+    player.tilt = Math.min(player.tilt + 0.5 * amt, 3);
   } else {
     player.vx *= 0.85;
     player.tilt *= 0.85;
