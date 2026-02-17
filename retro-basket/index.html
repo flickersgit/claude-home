@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRO SHOOTOUT - MJ vs Curry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const C=document.getElementById('game'),X=C.getContext('2d');
+const W=800,H=600;
+C.width=W;C.height=H;
+
+function resize(){
+  const s=Math.min(window.innerWidth/W,window.innerHeight/H)*0.95;
+  C.style.width=W*s+'px';C.style.height=H*s+'px';
+}
+resize();window.addEventListener('resize',resize);
+
+// ==================== MUSIC ENGINE ====================
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+const masterGain=AC.createGain();
+masterGain.gain.value=0.35;
+masterGain.connect(AC.destination);
+
+// Music state
+let musicPlaying=null; // 'menu','game','result','fire'
+let musicNodes=[];
+let musicVolume=0.35;
+let musicMuted=false;
+
+function stopMusic(){
+  musicNodes.forEach(n=>{
+    try{n.stop();n.disconnect();}catch(e){}
+  });
+  musicNodes=[];
+  musicPlaying=null;
+}
+
+function createOsc(type,freq,gainVal,dest){
+  const o=AC.createOscillator();
+  const g=AC.createGain();
+  o.type=type;
+  o.frequency.value=freq;
+  g.gain.value=gainVal;
+  o.connect(g);
+  g.connect(dest||masterGain);
+  return{osc:o,gain:g};
+}
+
+// Schedule a repeating note pattern
+function schedulePattern(notes,bpm,type,vol,loopLen,startTime){
+  const beatDur=60/bpm;
+  const allNodes=[];
+
+  function scheduleLoop(baseTime){
+    notes.forEach(([beat,freq,dur])=>{
+      const o=AC.createOscillator();
+      const g=AC.createGain();
+      o.type=type;
+      o.connect(g);
+      g.connect(masterGain);
+
+      const noteStart=baseTime+beat*beatDur;
+      const noteEnd=noteStart+dur*beatDur;
+
+      o.frequency.setValueAtTime(freq,noteStart);
+      g.gain.setValueAtTime(0,noteStart-0.01);
+      g.gain.linearRampToValueAtTime(vol,noteStart+0.01);
+      g.gain.setValueAtTime(vol,noteEnd-0.03);
+      g.gain.linearRampToValueAtTime(0,noteEnd);
+
+      o.start(noteStart-0.01);
+      o.stop(noteEnd+0.05);
+      allNodes.push(o);
+      musicNodes.push(o);
+    });
+  }
+
+  // Schedule multiple loops ahead
+  const loopDur=loopLen*beatDur;
+  const totalLoops=120; // ~2-4 min depending on bpm
+  for(let i=0;i<totalLoops;i++){
+    scheduleLoop(startTime+i*loopDur);
+  }
+  return allNodes;
+}
+
+// ---- MENU MUSIC: Epic NBA intro vibe ----
+function playMenuMusic(){
+  if(musicPlaying==='menu') return;
+  stopMusic();
+  musicPlaying='menu';
+  const t=AC.currentTime+0.1;
+  const bpm=100;
+
+  // Bass line - dramatic, building tension
+  const bass=[
+    [0,82,1.5],[2,82,0.5],[3,98,1],[4.5,73,0.5],
+    [5,110,1],[6.5,82,0.5],[7,98,1.5],
+    [8,82,1.5],[10,82,0.5],[11,110,1],[12.5,130,0.5],
+    [13,98,1.5],[14.5,82,0.5],[15,73,1.5],
+  ];
+  schedulePattern(bass,bpm,'sawtooth',0.12,16,t);
+
+  // Lead melody - triumphant playoff theme
+  const lead=[
+    [0,330,0.75],[1,392,0.75],[2,440,1.5],[4,523,0.5],[4.5,494,0.5],
+    [5,440,1],[6,392,0.5],[6.5,440,0.5],[7,330,1.5],
+    [8,330,0.75],[9,392,0.75],[10,440,0.5],[10.5,523,0.5],[11,587,1.5],
+    [12.5,523,0.5],[13,494,0.75],[13.75,440,0.75],[14.5,392,0.5],[15,330,1.5],
+  ];
+  schedulePattern(lead,bpm,'square',0.08,16,t);
+
+  // Harmony - power chords
+  const harm=[
+    [0,165,2],[2,196,2],[4,220,2],[6,196,2],
+    [8,165,2],[10,196,2],[12,262,2],[14,196,2],
+  ];
+  schedulePattern(harm,bpm,'triangle',0.06,16,t);
+
+  // Drums - kick pattern
+  const kick=[
+    [0,60,0.15],[2,60,0.15],[4,60,0.15],[5,60,0.15],[6,60,0.15],
+    [8,60,0.15],[10,60,0.15],[12,60,0.15],[13,60,0.15],[14,60,0.15],
+  ];
+  schedulePattern(kick,bpm,'sine',0.2,16,t);
+
+  // Hi-hat
+  const hh=[];
+  for(let i=0;i<16;i++) hh.push([i,8000,0.05]);
+  for(let i=0;i<16;i+=0.5) hh.push([i,12000,0.03]);
+  schedulePattern(hh,bpm,'square',0.02,16,t);
+
+  // Snare on 2 and 4
+  const snare=[
+    [1,200,0.1],[3,200,0.1],[5,200,0.1],[7,200,0.1],
+    [9,200,0.1],[11,200,0.1],[13,200,0.1],[15,200,0.1],
+  ];
+  schedulePattern(snare,bpm,'sawtooth',0.06,16,t);
+}
+
+// ---- GAME MUSIC: High energy playoff intensity ----
+function playGameMusic(){
+  if(musicPlaying==='game') return;
+  stopMusic();
+  musicPlaying='game';
+  const t=AC.currentTime+0.1;
+  const bpm=140;
+
+  // Driving bass - aggressive 8th note pattern
+  const bass=[
+    [0,110,0.4],[0.5,110,0.3],[1,130,0.4],[1.5,130,0.3],
+    [2,146,0.4],[2.5,146,0.3],[3,130,0.4],[3.5,110,0.3],
+    [4,98,0.4],[4.5,98,0.3],[5,110,0.4],[5.5,110,0.3],
+    [6,130,0.4],[6.5,146,0.3],[7,164,0.4],[7.5,146,0.3],
+    [8,110,0.4],[8.5,110,0.3],[9,130,0.4],[9.5,130,0.3],
+    [10,146,0.4],[10.5,146,0.3],[11,174,0.4],[11.5,164,0.3],
+    [12,146,0.4],[12.5,130,0.3],[13,110,0.4],[13.5,130,0.3],
+    [14,98,0.4],[14.5,110,0.3],[15,130,0.4],[15.5,110,0.3],
+  ];
+  schedulePattern(bass,bpm,'sawtooth',0.1,16,t);
+
+  // Hype melody - arena organ style
+  const lead=[
+    [0,440,0.25],[0.5,523,0.25],[1,587,0.5],[2,523,0.25],[2.5,587,0.25],
+    [3,659,0.75],[4,587,0.25],[4.5,523,0.25],[5,440,0.5],
+    [6,523,0.25],[6.5,587,0.25],[7,523,0.75],
+    [8,440,0.25],[8.5,523,0.25],[9,587,0.5],[10,659,0.25],[10.5,698,0.25],
+    [11,784,0.75],[12,698,0.25],[12.5,659,0.25],[13,587,0.5],
+    [14,523,0.5],[14.5,440,0.25],[15,523,0.75],
+  ];
+  schedulePattern(lead,bpm,'square',0.06,16,t);
+
+  // Organ chords
+  const chords=[
+    [0,220,2],[0,277,2],[2,246,2],[2,311,2],
+    [4,196,2],[4,246,2],[6,220,2],[6,277,2],
+    [8,220,2],[8,277,2],[10,246,2],[10,311,2],
+    [12,262,2],[12,330,2],[14,246,2],[14,311,2],
+  ];
+  schedulePattern(chords,bpm,'triangle',0.04,16,t);
+
+  // Kick drum - four on the floor with syncopation
+  const kick=[
+    [0,55,0.1],[1,55,0.1],[2,55,0.1],[3,55,0.1],
+    [4,55,0.1],[5,55,0.1],[6,55,0.1],[7,55,0.1],
+    [8,55,0.1],[9,55,0.1],[10,55,0.1],[11,55,0.1],
+    [12,55,0.1],[13,55,0.1],[14,55,0.1],[15,55,0.1],
+  ];
+  schedulePattern(kick,bpm,'sine',0.18,16,t);
+
+  // Snare - backbeat with fills
+  const snare=[
+    [1,180,0.08],[3,180,0.08],[5,180,0.08],[7,180,0.08],
+    [9,180,0.08],[11,180,0.08],[13,180,0.08],
+    [14.5,250,0.06],[15,280,0.06],[15.5,300,0.06],
+  ];
+  schedulePattern(snare,bpm,'sawtooth',0.06,16,t);
+
+  // Fast hi-hat
+  const hh=[];
+  for(let i=0;i<32;i+=0.5) hh.push([i/2,10000,0.03]);
+  schedulePattern(hh,bpm,'square',0.015,16,t);
+
+  // Crowd chant rhythm (low tone)
+  const chant=[
+    [0,82,0.3],[1,82,0.3],[2,82,0.3],[2.5,82,0.15],[3,98,0.5],
+    [8,82,0.3],[9,82,0.3],[10,82,0.3],[10.5,82,0.15],[11,98,0.5],
+  ];
+  schedulePattern(chant,bpm,'triangle',0.05,16,t);
+}
+
+// ---- ON FIRE MUSIC: Extra hype layer ----
+function playFireMusic(){
+  if(musicPlaying==='fire') return;
+  stopMusic();
+  musicPlaying='fire';
+  const t=AC.currentTime+0.1;
+  const bpm=160;
+
+  // Frantic bass
+  const bass=[];
+  const fireNotes=[130,146,164,174,196,174,164,146];
+  for(let i=0;i<16;i++){
+    bass.push([i*0.5,fireNotes[i%8],0.35]);
+  }
+  schedulePattern(bass,bpm,'sawtooth',0.12,8,t);
+
+  // Siren lead
+  const siren=[
+    [0,880,0.5],[0.5,1046,0.5],[1,880,0.5],[1.5,1046,0.5],
+    [2,784,0.5],[2.5,880,0.5],[3,1046,0.5],[3.5,1174,0.5],
+    [4,880,0.5],[4.5,1046,0.5],[5,880,0.5],[5.5,1046,0.5],
+    [6,1174,0.5],[6.5,1318,0.5],[7,1174,0.5],[7.5,1046,0.5],
+  ];
+  schedulePattern(siren,bpm,'square',0.05,8,t);
+
+  // Power chords
+  const pwr=[
+    [0,220,1],[0,330,1],[1,246,1],[1,370,1],
+    [2,262,1],[2,392,1],[3,220,1],[3,330,1],
+    [4,220,1],[4,330,1],[5,262,1],[5,392,1],
+    [6,294,1],[6,440,1],[7,262,1],[7,392,1],
+  ];
+  schedulePattern(pwr,bpm,'triangle',0.05,8,t);
+
+  // Double-time kick
+  const kick=[];
+  for(let i=0;i<16;i++) kick.push([i*0.5,50,0.08]);
+  schedulePattern(kick,bpm,'sine',0.2,8,t);
+
+  // Rapid snare
+  const snare=[];
+  for(let i=0;i<8;i++) snare.push([i+0.5,220,0.06]);
+  snare.push([7.5,250,0.06],[7.75,280,0.06]);
+  schedulePattern(snare,bpm,'sawtooth',0.07,8,t);
+
+  // Alarm hi-hat
+  const hh=[];
+  for(let i=0;i<32;i+=0.25) hh.push([i/4,12000,0.02]);
+  schedulePattern(hh,bpm,'square',0.012,8,t);
+}
+
+// ---- RESULT MUSIC: Victory fanfare ----
+function playResultMusic(winner){
+  if(musicPlaying==='result') return;
+  stopMusic();
+  musicPlaying='result';
+  const t=AC.currentTime+0.1;
+  const bpm=120;
+
+  // Fanfare melody
+  const melody=[
+    [0,392,0.5],[0.5,392,0.25],[1,440,0.5],[2,494,0.5],[2.5,494,0.25],
+    [3,523,1],[4.5,587,0.5],[5,659,1.5],
+    [7,587,0.5],[7.5,523,0.5],[8,587,0.5],[8.5,659,0.5],
+    [9,784,2],[11.5,698,0.5],[12,659,1],[13.5,587,0.5],
+    [14,523,2],
+    [16,392,0.5],[16.5,392,0.25],[17,440,0.5],[18,523,0.5],[18.5,587,0.25],
+    [19,659,1.5],[21,587,0.5],[21.5,659,0.5],
+    [22,784,1],[23.5,880,0.5],[24,784,1],[25.5,698,0.5],
+    [26,659,1],[27.5,587,0.5],[28,523,2.5],[30.5,659,0.5],[31,784,2],
+  ];
+  schedulePattern(melody,bpm,'square',0.08,32,t);
+
+  // Triumphant bass
+  const bass=[
+    [0,130,2],[2,146,2],[4,164,2],[6,146,2],
+    [8,130,2],[10,164,2],[12,196,2],[14,164,2],
+    [16,130,2],[18,146,2],[20,164,2],[22,196,2],
+    [24,220,2],[26,196,2],[28,164,2],[30,130,2],
+  ];
+  schedulePattern(bass,bpm,'sawtooth',0.1,32,t);
+
+  // Harmony
+  const harm=[
+    [0,262,4],[4,294,4],[8,262,4],[12,330,4],
+    [16,262,4],[20,330,4],[24,349,4],[28,262,4],
+  ];
+  schedulePattern(harm,bpm,'triangle',0.05,32,t);
+
+  // Celebratory drums
+  const kick=[
+    [0,55,0.1],[2,55,0.1],[4,55,0.1],[5,55,0.1],[6,55,0.1],
+    [8,55,0.1],[10,55,0.1],[12,55,0.1],[14,55,0.1],
+    [16,55,0.1],[18,55,0.1],[20,55,0.1],[22,55,0.1],
+    [24,55,0.1],[25,55,0.1],[26,55,0.1],[27,55,0.1],[28,55,0.1],[30,55,0.1],
+  ];
+  schedulePattern(kick,bpm,'sine',0.15,32,t);
+
+  const snare=[
+    [1,180,0.08],[3,180,0.08],[5,180,0.08],[7,180,0.08],
+    [9,180,0.08],[11,180,0.08],[13,180,0.08],[15,180,0.08],
+    [17,180,0.08],[19,180,0.08],[21,180,0.08],[23,180,0.08],
+    [25,180,0.08],[26,180,0.06],[26.5,200,0.06],[27,220,0.06],[27.5,240,0.06],
+    [28,180,0.08],[30,180,0.08],
+  ];
+  schedulePattern(snare,bpm,'sawtooth',0.06,32,t);
+
+  // Confetti sparkles
+  const sparkle=[];
+  for(let i=0;i<32;i+=2){
+    const f=1200+Math.sin(i)*400;
+    sparkle.push([i+0.25,f,0.1],[i+0.75,f+200,0.1],[i+1.5,f+100,0.1]);
+  }
+  schedulePattern(sparkle,bpm,'sine',0.02,32,t);
+}
+
+function toggleMusic(){
+  musicMuted=!musicMuted;
+  masterGain.gain.value=musicMuted?0:musicVolume;
+}
+
+// ==================== SFX ====================
+// SFX go through separate gain so music mute doesn't kill them
+const sfxGain=AC.createGain();
+sfxGain.gain.value=0.5;
+sfxGain.connect(AC.destination);
+
+function snd(type){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(sfxGain);
+  const t=AC.currentTime;
+  switch(type){
+    case'shoot':
+      o.type='triangle';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(600,t+0.1);
+      g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+      o.start(t);o.stop(t+0.15);break;
+    case'swish':
+      o.type='sine';o.frequency.setValueAtTime(800,t);o.frequency.exponentialRampToValueAtTime(1600,t+0.15);
+      g.gain.setValueAtTime(0.15,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
+      o.start(t);o.stop(t+0.2);
+      // second tone
+      const o2=AC.createOscillator(),g2=AC.createGain();
+      o2.connect(g2);g2.connect(sfxGain);
+      o2.type='sine';o2.frequency.setValueAtTime(1200,t+0.1);o2.frequency.exponentialRampToValueAtTime(2000,t+0.25);
+      g2.gain.setValueAtTime(0.1,t+0.1);g2.gain.exponentialRampToValueAtTime(0.01,t+0.3);
+      o2.start(t+0.1);o2.stop(t+0.3);break;
+    case'miss':
+      o.type='square';o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(80,t+0.2);
+      g.gain.setValueAtTime(0.15,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.25);
+      o.start(t);o.stop(t+0.25);break;
+    case'bounce':
+      o.type='triangle';o.frequency.setValueAtTime(400,t);o.frequency.exponentialRampToValueAtTime(150,t+0.08);
+      g.gain.setValueAtTime(0.12,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+      o.start(t);o.stop(t+0.1);break;
+    case'buzzer':
+      o.type='sawtooth';o.frequency.setValueAtTime(150,t);
+      g.gain.setValueAtTime(0.3,t);g.gain.setValueAtTime(0.3,t+0.3);g.gain.exponentialRampToValueAtTime(0.01,t+0.8);
+      o.start(t);o.stop(t+0.8);break;
+    case'cheer':
+      o.type='sawtooth';o.frequency.setValueAtTime(500,t);o.frequency.exponentialRampToValueAtTime(1500,t+0.3);
+      g.gain.setValueAtTime(0.08,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.4);
+      o.start(t);o.stop(t+0.4);break;
+    case'select':
+      o.type='square';o.frequency.setValueAtTime(600,t);o.frequency.exponentialRampToValueAtTime(900,t+0.08);
+      g.gain.setValueAtTime(0.1,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+      o.start(t);o.stop(t+0.1);break;
+  }
+}
+
+// Game State
+let state='menu'; // menu, select, playing, result
+let gameMode='1v1'; // 1v1, solo_mj, solo_curry
+let currentPlayer=0; // 0=MJ, 1=Curry
+let scores=[0,0];
+let shotsLeft=[10,10];
+let totalShots=10;
+let round=1, maxRounds=3;
+let roundScores=[[],[]]; // scores per round
+
+// Shot mechanics
+let shotPhase='aim'; // aim, power, flying, scored, missed
+let aimAngle=45, aimDir=1, aimSpeed=60;
+let powerLevel=0, powerDir=1, powerSpeed=80;
+let ball=null;
+let ballTrail=[];
+let shotClock=0;
+let consecutiveHits=[0,0];
+let onFire=[false,false];
+let fireTimer=[0,0];
+
+// Positions
+const SPOTS=[
+  {x:150,y:420,label:'CORNER 3',pts:3,diff:0.85},
+  {x:250,y:400,label:'WING 3',pts:3,diff:0.8},
+  {x:400,y:370,label:'TOP KEY',pts:3,diff:0.75},
+  {x:550,y:400,label:'WING 3',pts:3,diff:0.8},
+  {x:650,y:420,label:'CORNER 3',pts:3,diff:0.85},
+  {x:300,y:340,label:'ELBOW',pts:2,diff:0.6},
+  {x:500,y:340,label:'ELBOW',pts:2,diff:0.6},
+  {x:400,y:300,label:'FREE THROW',pts:2,diff:0.5},
+  {x:400,y:250,label:'MID RANGE',pts:2,diff:0.55},
+  {x:400,y:430,label:'HALF COURT',pts:4,diff:0.95},
+];
+let currentSpot=0;
+let spotOrder=[];
+
+// Hoop
+const HOOP={x:400,y:140,rimLeft:370,rimRight:430,netBottom:175};
+
+// Particles
+let particles=[];
+let flashText=[];
+let crowd=[];
+
+// ==================== ENEMIES ====================
+let enemies=[];
+let enemyWave=0;
+let enemySpawnTimer=0;
+let enemiesKilled=0;
+
+const ENEMY_TYPES={
+  // Defender: patrols near the rim, jumps to block shots
+  defender:{
+    name:'DEFENDER',color:'#0f0',accentColor:'#0a0',
+    w:20,h:36,speed:1.5,jumpH:60,jumpSpeed:3,
+    points:-2, radius:14
+  },
+  // Drone: flies across screen horizontally, deflects ball
+  drone:{
+    name:'DRONE',color:'#f0f',accentColor:'#a0a',
+    w:24,h:12,speed:2.5,
+    points:-1, radius:12
+  },
+  // Mascot: runs across court waving, speeds up your aim if near you
+  mascot:{
+    name:'MASCOT',color:'#f80',accentColor:'#a50',
+    w:18,h:30,speed:2,
+    points:0, radius:16
+  },
+  // Bird: small fast, flies diagonally, can hit ball
+  bird:{
+    name:'BIRD',color:'#ff0',accentColor:'#aa0',
+    w:14,h:10,speed:3.5,
+    points:-1, radius:8
+  }
+};
+
+function spawnEnemies(){
+  enemies=[];
+  enemyWave++;
+  const count=Math.min(2+Math.floor(enemyWave/2),6);
+
+  for(let i=0;i<count;i++){
+    const types=['defender','drone','mascot','bird'];
+    // Weight toward defenders and drones
+    const weights=[0.35,0.3,0.15,0.2];
+    let r=Math.random(),type='defender',sum=0;
+    for(let j=0;j<types.length;j++){
+      sum+=weights[j];
+      if(r<sum){type=types[j];break;}
+    }
+
+    const e={
+      type,
+      active:true,
+      timer:Math.random()*Math.PI*2,
+      spawnDelay:i*1.5, // stagger spawns
+      spawned:false,
+      ...createEnemy(type,i)
+    };
+    enemies.push(e);
+  }
+}
+
+function createEnemy(type,idx){
+  switch(type){
+    case'defender':
+      return{
+        x:HOOP.rimLeft-40+Math.random()*120,
+        y:200+Math.random()*60,
+        baseY:200+Math.random()*60,
+        vx:(Math.random()>0.5?1:-1)*ENEMY_TYPES.defender.speed,
+        vy:0,
+        jumping:false,jumpTimer:0,
+        patrolLeft:HOOP.rimLeft-60,
+        patrolRight:HOOP.rimRight+60,
+      };
+    case'drone':
+      const fromLeft=Math.random()>0.5;
+      const dy=120+Math.random()*150;
+      return{
+        x:fromLeft?-30:W+30,
+        y:dy,
+        vx:(fromLeft?1:-1)*ENEMY_TYPES.drone.speed*(1+enemyWave*0.1),
+        vy:Math.sin(idx)*0.3,
+        propAngle:0,
+      };
+    case'mascot':
+      const mFromLeft=Math.random()>0.5;
+      return{
+        x:mFromLeft?-30:W+30,
+        y:350+Math.random()*80,
+        vx:(mFromLeft?1:-1)*ENEMY_TYPES.mascot.speed,
+        vy:0,
+        wavePhase:0,
+        affectRange:120,
+      };
+    case'bird':
+      const bFromLeft=Math.random()>0.5;
+      return{
+        x:bFromLeft?-20:W+20,
+        y:100+Math.random()*200,
+        vx:(bFromLeft?1:-1)*ENEMY_TYPES.bird.speed*(1+enemyWave*0.08),
+        vy:(Math.random()-0.5)*2,
+        flapPhase:0,
+      };
+  }
+}
+
+function updateEnemies(dt){
+  enemySpawnTimer+=dt;
+
+  enemies.forEach(e=>{
+    if(!e.active) return;
+    // Staggered spawn
+    if(!e.spawned){
+      if(enemySpawnTimer>e.spawnDelay) e.spawned=true;
+      else return;
+    }
+    e.timer+=dt;
+
+    switch(e.type){
+      case'defender':
+        // Patrol near rim
+        e.x+=e.vx;
+        if(e.x<e.patrolLeft||e.x>e.patrolRight) e.vx*=-1;
+
+        // Jump when ball is near
+        if(ball&&shotPhase==='flying'&&!e.jumping){
+          const dist=Math.hypot(ball.x-e.x,ball.y-e.y);
+          if(dist<80&&ball.vy<0){
+            e.jumping=true;
+            e.jumpTimer=0;
+          }
+        }
+        if(e.jumping){
+          e.jumpTimer+=dt*ENEMY_TYPES.defender.jumpSpeed;
+          e.y=e.baseY-Math.sin(Math.min(e.jumpTimer,Math.PI))*ENEMY_TYPES.defender.jumpH;
+          if(e.jumpTimer>Math.PI){
+            e.jumping=false;
+            e.y=e.baseY;
+          }
+        }
+        break;
+
+      case'drone':
+        e.x+=e.vx;
+        e.y+=Math.sin(e.timer*2)*0.8;
+        e.propAngle+=dt*20;
+        // Remove when off screen
+        if(e.x<-50||e.x>W+50) e.active=false;
+        break;
+
+      case'mascot':
+        e.x+=e.vx;
+        e.wavePhase+=dt*5;
+        // Remove when off screen
+        if(e.x<-50||e.x>W+50) e.active=false;
+        break;
+
+      case'bird':
+        e.x+=e.vx;
+        e.y+=e.vy+Math.sin(e.timer*4)*0.5;
+        e.flapPhase+=dt*12;
+        // Bounce off top/bottom
+        if(e.y<80||e.y>350) e.vy*=-1;
+        if(e.x<-40||e.x>W+40) e.active=false;
+        break;
+    }
+
+    // Ball collision (deflect ball)
+    if(ball&&shotPhase==='flying'&&!ball.scored&&e.spawned){
+      const et=ENEMY_TYPES[e.type];
+      const dist=Math.hypot(ball.x-e.x,ball.y-e.y);
+      if(dist<et.radius+ball.radius){
+        // Deflect!
+        const angle=Math.atan2(ball.y-e.y,ball.x-e.x);
+        ball.vx=Math.cos(angle)*3;
+        ball.vy=Math.sin(angle)*3;
+
+        snd('bounce');
+        spawnParticles(ball.x,ball.y,'#f00',10,3);
+        addFlashText(e.x,e.y-30,'BLOCKED!','#f00',22);
+
+        // Defender jumps trigger
+        if(e.type==='defender'){
+          addFlashText(e.x,e.y-50,'GET THAT OUTTA HERE!','#0f0',14);
+        }
+
+        crowd.forEach(c=>c.excitement=2);
+      }
+    }
+
+    // Mascot effect: speed up aim when near shooter
+    if(e.type==='mascot'&&e.spawned&&(shotPhase==='aim'||shotPhase==='power')){
+      const spot=SPOTS[spotOrder[Math.min(currentSpot,spotOrder.length-1)]];
+      const dist=Math.hypot(e.x-spot.x,e.y-spot.y);
+      if(dist<e.affectRange){
+        // Make aim/power move faster (distraction!)
+        if(shotPhase==='aim') aimAngle+=aimDir*30*dt;
+        if(shotPhase==='power') powerLevel+=powerDir*25*dt;
+      }
+    }
+  });
+}
+
+function drawEnemies(){
+  enemies.forEach(e=>{
+    if(!e.active||!e.spawned) return;
+    const et=ENEMY_TYPES[e.type];
+    X.save();
+    X.translate(e.x,e.y);
+
+    switch(e.type){
+      case'defender':
+        const s=2;
+        const facingBall=ball?(ball.x>e.x?1:-1):(e.vx>0?1:-1);
+        if(facingBall<0) X.scale(-1,1);
+
+        // Shadow
+        X.fillStyle='rgba(0,0,0,0.3)';
+        X.beginPath();
+        X.ellipse(0,18+(!e.jumping?0:20),12,3,0,0,Math.PI*2);
+        X.fill();
+
+        // Legs
+        const legAnim=Math.sin(e.timer*6)*2;
+        X.fillStyle='#333';
+        X.fillRect(-4*s,8*s,3*s,5*s+legAnim);
+        X.fillRect(1*s,8*s,3*s,5*s-legAnim);
+        // Shoes
+        X.fillStyle='#fff';
+        X.fillRect(-5*s,12*s+legAnim,4*s,2*s);
+        X.fillRect(1*s,12*s-legAnim,4*s,2*s);
+
+        // Body
+        X.fillStyle=et.color;
+        X.fillRect(-4*s,0,8*s,9*s);
+        // Number
+        X.fillStyle='#fff';
+        X.font='bold 8px Courier New';
+        X.textAlign='center';
+        X.fillText('X',0,6*s);
+
+        // Arms
+        X.fillStyle='#8B5E3C';
+        if(e.jumping){
+          // Arms up blocking
+          X.fillRect(-5*s,-6*s,2*s,7*s);
+          X.fillRect(3*s,-6*s,2*s,7*s);
+          // Hands
+          X.fillRect(-6*s,-7*s,3*s,2*s);
+          X.fillRect(3*s,-7*s,3*s,2*s);
+        } else {
+          X.fillRect(-5*s,1*s,2*s,5*s);
+          X.fillRect(3*s,1*s,2*s,5*s);
+        }
+
+        // Head
+        X.fillStyle='#8B5E3C';
+        X.fillRect(-3*s,-5*s,6*s,5*s);
+        // Headband
+        X.fillStyle=et.color;
+        X.fillRect(-3*s,-4*s,6*s,1*s);
+        // Eyes
+        X.fillStyle='#fff';
+        X.fillRect(-2*s,-3*s,1.5*s,1*s);
+        X.fillRect(0.5*s,-3*s,1.5*s,1*s);
+        X.fillStyle='#000';
+        X.fillRect(-1*s,-3*s,1*s,1*s);
+        X.fillRect(1*s,-3*s,1*s,1*s);
+        // Angry mouth
+        X.fillStyle='#000';
+        X.fillRect(-1.5*s,-1*s,3*s,0.5*s);
+
+        // Block indicator when jumping
+        if(e.jumping){
+          X.fillStyle='#f00';
+          X.globalAlpha=0.5+Math.sin(e.timer*10)*0.3;
+          X.font='bold 10px Courier New';
+          X.fillText('BLOCK!',0,-10*s);
+          X.globalAlpha=1;
+        }
+        break;
+
+      case'drone':
+        // Body
+        X.fillStyle=et.color;
+        X.fillRect(-12,-5,24,10);
+        X.fillStyle=et.accentColor;
+        X.fillRect(-8,-3,16,6);
+        // Eye/camera
+        X.fillStyle='#f00';
+        const blink=Math.sin(e.timer*3)>0.8;
+        if(!blink){
+          X.beginPath();
+          X.arc(0,0,3,0,Math.PI*2);
+          X.fill();
+        }
+        // Propellers
+        X.fillStyle='#ccc';
+        const pLen=8;
+        X.save();
+        X.translate(-10,-5);
+        X.rotate(e.propAngle);
+        X.fillRect(-pLen,-1,pLen*2,2);
+        X.restore();
+        X.save();
+        X.translate(10,-5);
+        X.rotate(-e.propAngle);
+        X.fillRect(-pLen,-1,pLen*2,2);
+        X.restore();
+        // Danger zone glow
+        X.strokeStyle='rgba(255,0,255,0.2)';
+        X.beginPath();
+        X.arc(0,0,et.radius,0,Math.PI*2);
+        X.stroke();
+        break;
+
+      case'mascot':
+        // Body (bear mascot style)
+        X.fillStyle=et.color;
+        X.fillRect(-8,-12,16,24);
+        // Head
+        X.beginPath();
+        X.arc(0,-16,10,0,Math.PI*2);
+        X.fill();
+        // Ears
+        X.beginPath();
+        X.arc(-8,-24,4,0,Math.PI*2);
+        X.fill();
+        X.beginPath();
+        X.arc(8,-24,4,0,Math.PI*2);
+        X.fill();
+        // Inner ears
+        X.fillStyle=et.accentColor;
+        X.beginPath();
+        X.arc(-8,-24,2,0,Math.PI*2);
+        X.fill();
+        X.beginPath();
+        X.arc(8,-24,2,0,Math.PI*2);
+        X.fill();
+        // Eyes
+        X.fillStyle='#000';
+        X.beginPath();
+        X.arc(-4,-17,2,0,Math.PI*2);
+        X.fill();
+        X.beginPath();
+        X.arc(4,-17,2,0,Math.PI*2);
+        X.fill();
+        // Smile
+        X.strokeStyle='#000';
+        X.lineWidth=1.5;
+        X.beginPath();
+        X.arc(0,-13,5,0.2,Math.PI-0.2);
+        X.stroke();
+        // Waving arm
+        const waveAngle=Math.sin(e.wavePhase)*0.6;
+        X.save();
+        X.translate(10,-4);
+        X.rotate(waveAngle-0.8);
+        X.fillStyle=et.color;
+        X.fillRect(-2,-12,4,12);
+        // Hand/sign
+        X.fillStyle='#fff';
+        X.fillRect(-6,-16,12,6);
+        X.fillStyle='#f00';
+        X.font='bold 5px Courier New';
+        X.textAlign='center';
+        X.fillText('BOO!',0,-11);
+        X.restore();
+        // Legs animation
+        const mLeg=Math.sin(e.timer*5)*3;
+        X.fillStyle=et.color;
+        X.fillRect(-6,12,5,8+mLeg);
+        X.fillRect(1,12,5,8-mLeg);
+        // Feet
+        X.fillStyle='#333';
+        X.fillRect(-7,19+mLeg,6,3);
+        X.fillRect(1,19-mLeg,6,3);
+
+        // Distraction ring when near player
+        const spot2=SPOTS[spotOrder[Math.min(currentSpot,spotOrder.length-1)]];
+        const dist2=Math.hypot(e.x-spot2.x,e.y-spot2.y);
+        if(dist2<e.affectRange&&(shotPhase==='aim'||shotPhase==='power')){
+          X.strokeStyle='rgba(255,128,0,'+(.3+Math.sin(e.timer*6)*.2)+')';
+          X.lineWidth=2;
+          X.setLineDash([4,4]);
+          X.beginPath();
+          X.arc(0,0,e.affectRange,0,Math.PI*2);
+          X.stroke();
+          X.setLineDash([]);
+          // Warning text
+          X.fillStyle='#f80';
+          X.globalAlpha=0.7+Math.sin(e.timer*8)*0.3;
+          X.font='bold 10px Courier New';
+          X.textAlign='center';
+          X.fillText('DISTRACTED!',0,-32);
+          X.globalAlpha=1;
+        }
+        break;
+
+      case'bird':
+        const flap=Math.sin(e.flapPhase)*0.5;
+        X.fillStyle=et.color;
+        // Body
+        X.fillRect(-5,-3,10,6);
+        // Wings
+        X.save();
+        X.translate(-3,-3);
+        X.rotate(flap);
+        X.fillRect(-8,-2,8,3);
+        X.restore();
+        X.save();
+        X.translate(3,-3);
+        X.rotate(-flap);
+        X.fillRect(0,-2,8,3);
+        X.restore();
+        // Head
+        X.fillStyle=et.accentColor;
+        X.fillRect(e.vx>0?5:-8,-4,4,4);
+        // Eye
+        X.fillStyle='#000';
+        X.fillRect(e.vx>0?7:-6,-3,1,1);
+        // Beak
+        X.fillStyle='#f80';
+        X.fillRect(e.vx>0?9:-10,-2,3,2);
+        // Tail
+        X.fillStyle=et.accentColor;
+        X.fillRect(e.vx>0?-8:5,0,4,2);
+        break;
+    }
+
+    X.restore();
+  });
+}
+
+// SFX for enemies
+function sndBlock(){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(sfxGain);
+  const t=AC.currentTime;
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(300,t);
+  o.frequency.exponentialRampToValueAtTime(80,t+0.15);
+  g.gain.setValueAtTime(0.2,t);
+  g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
+  o.start(t);o.stop(t+0.2);
+}
+
+// Characters
+const PLAYERS=[
+  {name:'MICHAEL JORDAN',short:'MJ',number:23,team:'BULLS',
+   colors:{jersey:'#CE1141',shorts:'#CE1141',skin:'#8B5E3C',trim:'#000',shoe:'#CE1141',headband:null},
+   bonus:'mid', // MJ bonus on mid-range
+   sprite:null},
+  {name:'STEPHEN CURRY',short:'CURRY',number:30,team:'WARRIORS',
+   colors:{jersey:'#1D428A',shorts:'#1D428A',skin:'#C68642',trim:'#FFC72C',shoe:'#1D428A',headband:null},
+   bonus:'three', // Curry bonus on 3pt
+   sprite:null}
+];
+
+function initCrowd(){
+  crowd=[];
+  for(let i=0;i<60;i++){
+    crowd.push({
+      x:30+Math.random()*(W-60),
+      y:30+Math.random()*60,
+      color:['#CE1141','#1D428A','#FFC72C','#fff','#f80','#0f0','#f0f'][Math.floor(Math.random()*7)],
+      phase:Math.random()*Math.PI*2,
+      size:3+Math.random()*3,
+      excitement:0
+    });
+  }
+}
+
+function shuffleSpots(){
+  spotOrder=[];
+  // Build enough spots even if totalShots > SPOTS.length
+  while(spotOrder.length<totalShots){
+    let indices=[...Array(SPOTS.length).keys()];
+    for(let i=indices.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [indices[i],indices[j]]=[indices[j],indices[i]];
+    }
+    spotOrder.push(...indices);
+  }
+  spotOrder=spotOrder.slice(0,totalShots);
+}
+
+function startGame(){
+  AC.resume();
+  scores=[0,0];
+  shotsLeft=[totalShots,totalShots];
+  round=1;
+  roundScores=[[],[]];
+  currentPlayer=0;
+  consecutiveHits=[0,0];
+  onFire=[false,false];
+  fireTimer=[0,0];
+  enemies=[];
+  enemyWave=0;
+  enemySpawnTimer=0;
+  enemiesKilled=0;
+  shuffleSpots();
+  currentSpot=0;
+  startShot();
+  state='playing';
+  playGameMusic();
+}
+
+function startShot(){
+  shotPhase='aim';
+  aimAngle=45;
+  aimDir=1;
+  powerLevel=0;
+  powerDir=1;
+  ball=null;
+  ballTrail=[];
+  shotClock=0;
+  // Spawn new enemies each shot
+  enemySpawnTimer=0;
+  spawnEnemies();
+}
+
+function launchBall(){
+  const spotIdx=spotOrder[currentSpot];
+  if(spotIdx===undefined) return; // safety guard
+  const spot=SPOTS[spotIdx];
+  const rad=aimAngle*Math.PI/180;
+  const pw=3+powerLevel*0.07;
+
+  ball={
+    x:spot.x+(currentPlayer===0?-8:8),
+    y:spot.y-40,
+    vx:Math.cos(rad)*pw,
+    vy:-Math.sin(rad)*pw*1.2,
+    radius:6,
+    gravity:0.18,
+    bounced:false,
+    rimHits:0,
+    scored:false,
+    missed:false,
+    timer:0
+  };
+  ballTrail=[];
+  snd('shoot');
+}
+
+function nextTurn(){
+  shotsLeft[currentPlayer]--;
+  currentSpot++;
+
+  if(shotsLeft[currentPlayer]<=0){
+    // Switch player or end round
+    if(currentPlayer===0 && gameMode==='1v1'){
+      currentPlayer=1;
+      shotsLeft[1]=totalShots;
+      currentSpot=0;
+      shuffleSpots();
+      startShot();
+    } else {
+      // End round
+      roundScores[0].push(scores[0]);
+      roundScores[1].push(scores[1]);
+      if(round<maxRounds){
+        round++;
+        scores=[0,0];
+        shotsLeft=[totalShots,totalShots];
+        currentPlayer=0;
+        currentSpot=0;
+        shuffleSpots();
+        startShot();
+      } else {
+        state='result';
+        snd('buzzer');
+        setTimeout(()=>playResultMusic(),800);
+      }
+    }
+  } else {
+    startShot();
+  }
+}
+
+function spawnParticles(x,y,color,count,spd=3){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2;
+    const s=(0.5+Math.random())*spd;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,size:2+Math.random()*3});
+  }
+}
+
+function addFlashText(x,y,text,color,size=20){
+  flashText.push({x,y,text,color,size,life:1.5,vy:-1});
+}
+
+// Drawing
+function drawCourt(){
+  // Floor
+  const floorGrad=X.createLinearGradient(0,H*0.6,0,H);
+  floorGrad.addColorStop(0,'#C67A3C');
+  floorGrad.addColorStop(1,'#8B4513');
+  X.fillStyle=floorGrad;
+  X.fillRect(0,H*0.55,W,H*0.45);
+
+  // Court lines
+  X.strokeStyle='#fff';
+  X.lineWidth=2;
+  X.globalAlpha=0.4;
+
+  // Three point arc
+  X.beginPath();
+  X.ellipse(400,140,230,320,0,0.3*Math.PI,0.7*Math.PI);
+  X.stroke();
+
+  // Free throw line area
+  X.strokeRect(310,140,180,220);
+
+  // Center circle area at top
+  X.beginPath();
+  X.ellipse(400,140,60,40,0,0,Math.PI);
+  X.stroke();
+
+  // Paint
+  X.fillStyle='rgba(206,17,65,0.15)';
+  X.fillRect(310,140,180,220);
+
+  X.globalAlpha=1;
+
+  // Court border lines
+  X.strokeStyle='#fff';
+  X.lineWidth=3;
+  X.strokeRect(50,100,W-100,H-180);
+}
+
+function drawBackboard(){
+  // Backboard
+  X.fillStyle='#ddd';
+  X.fillRect(365,95,70,8);
+  X.strokeStyle='#999';
+  X.lineWidth=2;
+  X.strokeRect(365,95,70,8);
+
+  // Backboard square
+  X.strokeStyle='#f00';
+  X.lineWidth=1;
+  X.strokeRect(380,96,40,6);
+
+  // Rim
+  X.strokeStyle='#f60';
+  X.lineWidth=3;
+  X.beginPath();
+  X.moveTo(HOOP.rimLeft,HOOP.y);
+  X.lineTo(HOOP.rimRight,HOOP.y);
+  X.stroke();
+
+  // Rim circles
+  X.fillStyle='#f60';
+  X.beginPath();X.arc(HOOP.rimLeft,HOOP.y,4,0,Math.PI*2);X.fill();
+  X.beginPath();X.arc(HOOP.rimRight,HOOP.y,4,0,Math.PI*2);X.fill();
+
+  // Net
+  X.strokeStyle='rgba(255,255,255,0.6)';
+  X.lineWidth=1;
+  for(let i=0;i<7;i++){
+    const nx=HOOP.rimLeft+5+i*((HOOP.rimRight-HOOP.rimLeft-10)/6);
+    X.beginPath();
+    X.moveTo(nx,HOOP.y+2);
+    const sway=Math.sin(Date.now()/500+i)*2;
+    X.quadraticCurveTo(nx+sway,HOOP.y+20,400+(nx-400)*0.4,HOOP.netBottom);
+    X.stroke();
+  }
+}
+
+function drawPlayer(p,x,y,shooting=false,frame=0){
+  const c=PLAYERS[p].colors;
+  const s=2; // pixel scale
+  X.save();
+  X.translate(x,y);
+
+  const facingRight=HOOP.x>x;
+  if(!facingRight) X.scale(-1,1);
+
+  // Shadow
+  X.fillStyle='rgba(0,0,0,0.3)';
+  X.beginPath();
+  X.ellipse(0,24,14,4,0,0,Math.PI*2);
+  X.fill();
+
+  const armAngle=shooting?(-30-frame*40):0;
+
+  // Legs
+  X.fillStyle=c.shorts;
+  if(shooting&&frame>0.3){
+    // Jump
+    const jumpH=Math.sin(Math.min(frame,0.7)*Math.PI)*12;
+    X.fillRect(-5*s,10*s-jumpH,4*s,6*s);
+    X.fillRect(1*s,10*s-jumpH,4*s,6*s);
+    // Shoes
+    X.fillStyle=c.shoe;
+    X.fillRect(-6*s,15*s-jumpH,5*s,2*s);
+    X.fillRect(1*s,15*s-jumpH,5*s,2*s);
+    X.save();X.translate(0,-jumpH);
+  } else {
+    X.fillRect(-5*s,10*s,4*s,6*s);
+    X.fillRect(1*s,10*s,4*s,6*s);
+    // Shoes
+    X.fillStyle=c.shoe;
+    X.fillRect(-6*s,15*s,5*s,2*s);
+    X.fillRect(1*s,15*s,5*s,2*s);
+    X.save();
+  }
+
+  // Body / Jersey
+  X.fillStyle=c.jersey;
+  X.fillRect(-4*s,1*s,8*s,10*s);
+
+  // Jersey trim
+  X.fillStyle=c.trim;
+  X.fillRect(-4*s,1*s,8*s,1*s);
+
+  // Number
+  X.fillStyle='#fff';
+  X.font='bold 9px Courier New';
+  X.textAlign='center';
+  X.fillText(PLAYERS[p].number,0,8*s);
+
+  // Arms
+  X.fillStyle=c.skin;
+  if(shooting&&frame>0.2){
+    // Shooting arm up
+    X.save();
+    X.translate(3*s,2*s);
+    X.rotate(armAngle*Math.PI/180);
+    X.fillRect(-1*s,-8*s,2*s,8*s);
+    // Hand with ball reference
+    X.fillRect(-2*s,-9*s,3*s,2*s);
+    X.restore();
+    // Other arm
+    X.fillRect(-5*s,2*s,2*s,5*s);
+  } else {
+    X.fillRect(-5*s,2*s,2*s,6*s);
+    X.fillRect(4*s,2*s,2*s,6*s);
+  }
+
+  // Head
+  X.fillStyle=c.skin;
+  X.fillRect(-3*s,-5*s,6*s,6*s);
+
+  // Hair / features
+  if(p===0){
+    // MJ - bald head, slightly darker top
+    X.fillStyle='#6B4226';
+    X.fillRect(-3*s,-5*s,6*s,2*s);
+  } else {
+    // Curry - hair
+    X.fillStyle='#2C1810';
+    X.fillRect(-3*s,-6*s,6*s,2*s);
+    X.fillRect(-4*s,-5*s,1*s,2*s);
+    X.fillRect(3*s,-5*s,1*s,2*s);
+  }
+
+  // Eyes
+  X.fillStyle='#fff';
+  X.fillRect(-2*s,-3*s,2*s,1*s);
+  X.fillRect(1*s,-3*s,2*s,1*s);
+  X.fillStyle='#000';
+  X.fillRect(-1*s,-3*s,1*s,1*s);
+  X.fillRect(2*s,-3*s,1*s,1*s);
+
+  // Mouth
+  X.fillStyle='#000';
+  if(p===0&&shooting){
+    // MJ tongue out!
+    X.fillRect(-1*s,-1*s,3*s,1*s);
+    X.fillStyle='#f44';
+    X.fillRect(1*s,0,2*s,2*s);
+  } else {
+    X.fillRect(-1*s,-1*s,2*s,1*s);
+  }
+
+  // On fire effect
+  if(onFire[p]){
+    const ft=Date.now()/100;
+    for(let i=0;i<5;i++){
+      X.fillStyle=i%2?'#f80':'#ff0';
+      X.globalAlpha=0.6+Math.sin(ft+i)*0.3;
+      X.fillRect(
+        -4*s+Math.sin(ft+i*1.3)*3,
+        -7*s-i*3-Math.sin(ft*1.5+i)*3,
+        3*s,3*s
+      );
+    }
+    X.globalAlpha=1;
+  }
+
+  X.restore();
+  X.restore();
+}
+
+function drawBall(x,y,r=6){
+  // Ball
+  X.fillStyle='#f80';
+  X.beginPath();
+  X.arc(x,y,r,0,Math.PI*2);
+  X.fill();
+
+  // Lines on ball
+  X.strokeStyle='#a44';
+  X.lineWidth=1;
+  X.beginPath();
+  X.moveTo(x-r,y);X.lineTo(x+r,y);
+  X.stroke();
+  X.beginPath();
+  X.arc(x,y,r,0,Math.PI*2);
+  X.stroke();
+
+  // Highlight
+  X.fillStyle='rgba(255,255,200,0.3)';
+  X.beginPath();
+  X.arc(x-r*0.3,y-r*0.3,r*0.35,0,Math.PI*2);
+  X.fill();
+}
+
+function drawAimArrow(px,py){
+  const len=60;
+  const rad=aimAngle*Math.PI/180;
+  const startY=py-40;
+
+  // Arrow direction: 0°=right, 90°=up, 180°=left (full 180° arc)
+  const ex=px+Math.cos(rad)*len;
+  const ey=startY-Math.sin(rad)*len;
+
+  // Draw arc guide (faint)
+  X.strokeStyle='rgba(255,255,0,0.15)';
+  X.lineWidth=1;
+  X.beginPath();
+  X.arc(px,startY,len,0,-Math.PI,true);
+  X.stroke();
+
+  // Dotted line
+  X.strokeStyle='#ff0';
+  X.lineWidth=2;
+  X.setLineDash([4,4]);
+  X.beginPath();
+  X.moveTo(px,startY);
+  X.lineTo(ex,ey);
+  X.stroke();
+  X.setLineDash([]);
+
+  // Arrow head
+  X.fillStyle='#ff0';
+  X.beginPath();
+  const headAngle=Math.atan2(ey-startY,ex-px);
+  X.moveTo(ex,ey);
+  X.lineTo(ex-10*Math.cos(headAngle-0.4),ey-10*Math.sin(headAngle-0.4));
+  X.lineTo(ex-10*Math.cos(headAngle+0.4),ey-10*Math.sin(headAngle+0.4));
+  X.fill();
+
+  // Angle text
+  X.fillStyle='#ff0';
+  X.font='bold 12px Courier New';
+  X.textAlign='center';
+  X.fillText(Math.round(aimAngle)+'°',ex+(aimAngle>90?-20:20),ey-10);
+}
+
+function drawPowerBar(){
+  const bx=50,by=H-60,bw=200,bh=20;
+
+  X.fillStyle='#333';
+  X.fillRect(bx,by,bw,bh);
+
+  // Gradient power
+  const grad=X.createLinearGradient(bx,0,bx+bw,0);
+  grad.addColorStop(0,'#0f0');
+  grad.addColorStop(0.5,'#ff0');
+  grad.addColorStop(0.8,'#f80');
+  grad.addColorStop(1,'#f00');
+  X.fillStyle=grad;
+  X.fillRect(bx,by,bw*(powerLevel/100),bh);
+
+  // Sweet spot indicator (40-65%)
+  X.fillStyle='rgba(255,255,255,0.15)';
+  X.fillRect(bx+bw*0.4,by,bw*0.25,bh);
+
+  // Border
+  X.strokeStyle='#fff';
+  X.lineWidth=2;
+  X.strokeRect(bx,by,bw,bh);
+
+  // Label
+  X.fillStyle='#fff';
+  X.font='bold 12px Courier New';
+  X.textAlign='left';
+  X.fillText('POWER',bx,by-5);
+
+  // Sweet spot label
+  X.fillStyle='#0f0';
+  X.font='9px Courier New';
+  X.fillText('SWEET',bx+bw*0.43,by+bh+12);
+}
+
+function drawSpotIndicator(){
+  const spot=SPOTS[spotOrder[Math.min(currentSpot,spotOrder.length-1)]];
+  if(!spot) return;
+
+  // Pulsing circle at spot
+  const pulse=1+Math.sin(Date.now()/200)*0.15;
+  X.strokeStyle='#ff0';
+  X.lineWidth=2;
+  X.globalAlpha=0.6+Math.sin(Date.now()/300)*0.3;
+  X.beginPath();
+  X.arc(spot.x,spot.y,15*pulse,0,Math.PI*2);
+  X.stroke();
+  X.globalAlpha=1;
+
+  // Spot label
+  X.fillStyle='#ff0';
+  X.font='bold 11px Courier New';
+  X.textAlign='center';
+  X.fillText(spot.label,spot.x,spot.y+30);
+  X.fillText(spot.pts+'PTS',spot.x,spot.y+42);
+
+  if(onFire[currentPlayer]){
+    X.fillStyle='#f80';
+    X.fillText('x2 ON FIRE!',spot.x,spot.y+54);
+  }
+}
+
+function drawHUD(){
+  // Scoreboard background
+  X.fillStyle='rgba(0,0,0,0.7)';
+  X.fillRect(0,0,W,32);
+
+  // MJ score
+  X.fillStyle=currentPlayer===0?'#ff0':'#CE1141';
+  X.font='bold 14px Courier New';
+  X.textAlign='left';
+  X.fillText(`MJ #23: ${scores[0]}`,10,22);
+
+  // Curry score
+  X.fillStyle=currentPlayer===1?'#ff0':'#1D428A';
+  X.textAlign='right';
+  X.fillText(`CURRY #30: ${scores[1]}`,W-10,22);
+
+  // Round
+  X.fillStyle='#fff';
+  X.textAlign='center';
+  X.fillText(`ROUND ${round}/${maxRounds}`,W/2,14);
+
+  // Shots left
+  X.fillStyle='#aaa';
+  X.font='11px Courier New';
+  X.fillText(`SHOTS LEFT: ${shotsLeft[currentPlayer]}`,W/2,26);
+
+  // Current player indicator
+  const pName=PLAYERS[currentPlayer].short;
+  const pColor=currentPlayer===0?'#CE1141':'#1D428A';
+  X.fillStyle=pColor;
+  X.fillRect(W/2-50,34,100,20);
+  X.fillStyle='#fff';
+  X.font='bold 12px Courier New';
+  X.textAlign='center';
+  X.fillText(pName+"'S TURN",W/2,48);
+
+  // Consecutive hits indicator
+  if(consecutiveHits[currentPlayer]>=2){
+    X.fillStyle='#f80';
+    X.font='bold 10px Courier New';
+    X.fillText(`${consecutiveHits[currentPlayer]} IN A ROW!`,W/2,64);
+  }
+
+  // Enemy wave indicator
+  const activeEnemies=enemies.filter(e=>e.active&&e.spawned).length;
+  if(activeEnemies>0){
+    X.fillStyle='#f00';
+    X.font='bold 10px Courier New';
+    X.textAlign='left';
+    X.fillText(`ENEMIES: ${activeEnemies}`,10,H-10);
+  }
+
+  // Music indicator
+  X.fillStyle=musicMuted?'#666':'#0f0';
+  X.font='10px Courier New';
+  X.textAlign='right';
+  X.fillText(musicMuted?'[M] MUSIC OFF':'[M] MUSIC ON',W-10,H-10);
+}
+
+function drawCrowd(){
+  crowd.forEach(c=>{
+    const ex=c.excitement;
+    const bounce=ex>0?Math.sin(Date.now()/100+c.phase)*ex*3:0;
+    X.fillStyle=c.color;
+    // Head
+    X.fillRect(c.x-c.size/2,c.y-c.size+bounce,c.size,c.size);
+    // Body
+    X.fillStyle=c.color+'99';
+    X.fillRect(c.x-c.size/2-1,c.y+bounce,c.size+2,c.size*0.6);
+  });
+}
+
+// Menu
+function drawMenu(){
+  // Background
+  X.fillStyle='#1a0a2e';
+  X.fillRect(0,0,W,H);
+
+  // Court hint
+  drawCourt();
+
+  // Overlay
+  X.fillStyle='rgba(0,0,0,0.75)';
+  X.fillRect(0,0,W,H);
+
+  // Stars
+  for(let i=0;i<30;i++){
+    X.fillStyle=`rgba(255,255,255,${0.3+Math.sin(Date.now()/500+i)*0.3})`;
+    X.fillRect(50+i*24+Math.sin(i)*10, 20+Math.sin(i*2.3)*15, 2, 2);
+  }
+
+  // Title
+  X.fillStyle='#f80';
+  X.font='bold 48px Courier New';
+  X.textAlign='center';
+  X.shadowColor='#f80';X.shadowBlur=20;
+  X.fillText('RETRO',W/2,120);
+  X.fillStyle='#ff0';
+  X.shadowColor='#ff0';
+  X.fillText('SHOOTOUT',W/2,170);
+  X.shadowBlur=0;
+
+  // VS
+  X.fillStyle='#fff';
+  X.font='bold 28px Courier New';
+  X.fillText('MJ  vs  CURRY',W/2,220);
+
+  // Players
+  drawPlayer(0,W/2-120,320,false,0);
+  drawPlayer(1,W/2+120,320,false,0);
+
+  // Labels
+  X.fillStyle='#CE1141';
+  X.font='bold 14px Courier New';
+  X.fillText('#23 BULLS',W/2-120,380);
+  X.fillStyle='#1D428A';
+  X.fillText('#30 WARRIORS',W/2+120,380);
+
+  // Menu options
+  const opts=[
+    {label:'1 vs 1 MODE',desc:'Take turns shooting'},
+    {label:'PLAY AS MJ',desc:'Solo shooting contest'},
+    {label:'PLAY AS CURRY',desc:'Solo shooting contest'}
+  ];
+
+  opts.forEach((o,i)=>{
+    const y=430+i*50;
+    const hover=menuSel===i;
+    X.fillStyle=hover?'#ff0':'#888';
+    X.font=`bold ${hover?16:14}px Courier New`;
+    X.fillText((hover?'> ':'')+o.label+(hover?' <':''),W/2,y);
+    X.fillStyle='#666';
+    X.font='11px Courier New';
+    X.fillText(o.desc,W/2,y+16);
+  });
+
+  // Controls
+  X.fillStyle='#555';
+  X.font='11px Courier New';
+  X.fillText('[UP/DOWN] Select   [SPACE/ENTER] Start   [M] Music On/Off',W/2,H-20);
+}
+
+let menuSel=0;
+
+function drawResult(){
+  X.fillStyle='rgba(0,0,0,0.85)';
+  X.fillRect(0,0,W,H);
+
+  const totalA=roundScores[0].reduce((a,b)=>a+b,0);
+  const totalB=roundScores[1].reduce((a,b)=>a+b,0);
+
+  // Title
+  X.font='bold 36px Courier New';
+  X.textAlign='center';
+  if(totalA>totalB){
+    X.fillStyle='#CE1141';
+    X.shadowColor='#CE1141';X.shadowBlur=15;
+    X.fillText('MJ WINS!',W/2,80);
+  } else if(totalB>totalA){
+    X.fillStyle='#1D428A';
+    X.shadowColor='#1D428A';X.shadowBlur=15;
+    X.fillText('CURRY WINS!',W/2,80);
+  } else {
+    X.fillStyle='#ff0';
+    X.shadowColor='#ff0';X.shadowBlur=15;
+    X.fillText('TIE GAME!',W/2,80);
+  }
+  X.shadowBlur=0;
+
+  // Round breakdown
+  X.fillStyle='#fff';
+  X.font='bold 16px Courier New';
+  X.fillText('ROUND BREAKDOWN',W/2,130);
+
+  X.font='14px Courier New';
+  X.fillStyle='#aaa';
+  X.fillText('ROUND       MJ    CURRY',W/2,160);
+
+  for(let r=0;r<roundScores[0].length;r++){
+    X.fillStyle='#fff';
+    X.fillText(`  ${r+1}         ${roundScores[0][r]||0}      ${roundScores[1][r]||0}`,W/2,185+r*25);
+  }
+
+  X.fillStyle='#ff0';
+  X.font='bold 16px Courier New';
+  X.fillText(`TOTAL:     ${totalA}      ${totalB}`,W/2,185+roundScores[0].length*25+15);
+
+  // Winner character
+  const winner=totalA>=totalB?0:1;
+  drawPlayer(winner,W/2,400,false,0);
+
+  // Restart
+  X.fillStyle='#ff0';
+  X.font='bold 16px Courier New';
+  const blink=Math.sin(Date.now()/300)>0;
+  if(blink) X.fillText('[ PRESS SPACE TO PLAY AGAIN ]',W/2,500);
+
+  X.fillStyle='#666';
+  X.font='11px Courier New';
+  X.fillText('[ESC] Back to Menu',W/2,530);
+}
+
+// Main update
+let lastTime=0;
+let shootFrame=0;
+
+function update(dt){
+  // Particles
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.05;p.life-=dt*2;
+  });
+  particles=particles.filter(p=>p.life>0);
+
+  // Flash text
+  flashText.forEach(f=>{
+    f.y+=f.vy;f.life-=dt;
+  });
+  flashText=flashText.filter(f=>f.life>0);
+
+  // Crowd
+  crowd.forEach(c=>{
+    if(c.excitement>0) c.excitement*=0.98;
+  });
+
+  // Fire timer
+  fireTimer.forEach((t,i)=>{
+    if(t>0){
+      fireTimer[i]-=dt;
+      if(fireTimer[i]<=0){
+        onFire[i]=false;
+        if(state==='playing'&&musicPlaying==='fire') playGameMusic();
+      }
+    }
+  });
+
+  if(state!=='playing') return;
+
+  // Update enemies
+  updateEnemies(dt);
+
+  if(shotPhase==='aim'){
+    aimAngle+=aimDir*aimSpeed*dt;
+    if(aimAngle>170){aimAngle=170;aimDir=-1;}
+    if(aimAngle<10){aimAngle=10;aimDir=1;}
+
+  } else if(shotPhase==='power'){
+    powerLevel+=powerDir*powerSpeed*dt;
+    if(powerLevel>100){powerLevel=100;powerDir=-1;}
+    if(powerLevel<0){powerLevel=0;powerDir=1;}
+
+  } else if(shotPhase==='flying'){
+    if(!ball) return;
+    ball.timer+=dt;
+    ballTrail.push({x:ball.x,y:ball.y,life:0.5});
+    ballTrail=ballTrail.filter(function(t){t.life-=dt;return t.life>0;});
+
+    ball.x+=ball.vx;
+    ball.y+=ball.vy;
+    ball.vy+=ball.gravity;
+
+    // Rim collision
+    var rimY=HOOP.y;
+    if(ball.y>rimY-8&&ball.y<rimY+8){
+      if(Math.abs(ball.x-HOOP.rimLeft)<8&&ball.vx>-1){
+        ball.vx=-Math.abs(ball.vx)*0.5;
+        ball.vy*=0.6;
+        ball.rimHits++;
+        snd('bounce');
+        spawnParticles(HOOP.rimLeft,rimY,'#f60',5);
+      }
+      if(Math.abs(ball.x-HOOP.rimRight)<8&&ball.vx<1){
+        ball.vx=Math.abs(ball.vx)*0.5;
+        ball.vy*=0.6;
+        ball.rimHits++;
+        snd('bounce');
+        spawnParticles(HOOP.rimRight,rimY,'#f60',5);
+      }
+    }
+
+    // Backboard
+    if(ball.y<105&&ball.y>90&&ball.x>360&&ball.x<440){
+      ball.vy=Math.abs(ball.vy)*0.5;
+      ball.y=105;
+      snd('bounce');
+    }
+
+    // Check score - ball passes through rim
+    if(ball.y>rimY&&ball.y<rimY+15&&ball.x>HOOP.rimLeft+5&&ball.x<HOOP.rimRight-5&&ball.vy>0&&!ball.scored){
+      ball.scored=true;
+      var spot=SPOTS[spotOrder[Math.min(currentSpot,spotOrder.length-1)]];
+      var pts=spot?spot.pts:2;
+
+      // Bonus
+      var pl=PLAYERS[currentPlayer];
+      if(spot&&pl.bonus==='three'&&spot.pts===3) pts+=1;
+      if(spot&&pl.bonus==='mid'&&spot.pts===2) pts+=1;
+
+      // On fire double
+      if(onFire[currentPlayer]) pts*=2;
+
+      scores[currentPlayer]+=pts;
+      consecutiveHits[currentPlayer]++;
+
+      if(consecutiveHits[currentPlayer]>=3&&!onFire[currentPlayer]){
+        onFire[currentPlayer]=true;
+        fireTimer[currentPlayer]=20;
+        addFlashText(W/2,H/2-50,'ON FIRE!','#f80',32);
+        snd('cheer');
+        playFireMusic();
+      }
+
+      snd('swish');
+      spawnParticles(ball.x,ball.y,'#ff0',20,4);
+      spawnParticles(ball.x,ball.y,'#fff',10,3);
+
+      var txt=(spot?spot.label:'SHOT')+' +'+pts;
+      if(onFire[currentPlayer]) txt+=' (FIRE!)';
+      addFlashText(ball.x,ball.y-30,txt,'#0f0',18);
+
+      if(ball.rimHits===0) addFlashText(ball.x,ball.y-50,'SWISH!','#ff0',22);
+      else if(ball.rimHits>=2) addFlashText(ball.x,ball.y-50,'LUCKY!','#f80',18);
+
+      crowd.forEach(function(c){c.excitement=3;});
+      updateHUD();
+      shotPhase='scored';
+      shotClock=0;
+    }
+
+    // Miss - ball goes too low, off screen, or timeout
+    var missOffScreen=ball.y>H||ball.x<-50||ball.x>W+50;
+    var missFallingPastRim=ball.y>350&&ball.vy>0&&!ball.scored;
+    var missTimeout=ball.timer>5;
+    if(missOffScreen||missFallingPastRim||missTimeout){
+      if(!ball.scored){
+        ball.missed=true;
+        consecutiveHits[currentPlayer]=0;
+        if(onFire[currentPlayer]){onFire[currentPlayer]=false;playGameMusic();}
+        snd('miss');
+        addFlashText(Math.max(30,Math.min(ball.x,W-30)),Math.min(ball.y,H-50),'MISS!','#f44',20);
+        shotPhase='missed';
+        shotClock=0;
+      }
+    }
+
+  } else if(shotPhase==='scored'||shotPhase==='missed'){
+    shotClock+=dt;
+    if(ball){
+      ball.y+=ball.vy;
+      ball.vy+=0.3;
+      ball.x+=ball.vx*0.9;
+      if(ball.y>H-50){
+        ball.y=H-50;
+        ball.vy*=-0.4;
+        if(Math.abs(ball.vy)>1) snd('bounce');
+      }
+    }
+    var transitionTime=shotPhase==='scored'?1.0:0.8;
+    if(shotClock>transitionTime){
+      nextTurn();
+    }
+  }
+}
+
+function render(){
+  X.clearRect(0,0,W,H);
+
+  if(state==='menu'){
+    drawMenu();
+    return;
+  }
+  if(state==='result'){
+    // Draw court behind
+    X.fillStyle='#2a1a0a';X.fillRect(0,0,W,H);
+    drawCourt();
+    drawResult();
+    return;
+  }
+
+  // Sky / arena background
+  const skyGrad=X.createLinearGradient(0,0,0,H*0.55);
+  skyGrad.addColorStop(0,'#1a0a2e');
+  skyGrad.addColorStop(1,'#2d1b4e');
+  X.fillStyle=skyGrad;
+  X.fillRect(0,0,W,H*0.55);
+
+  // Crowd
+  drawCrowd();
+
+  // Court
+  drawCourt();
+
+  // Backboard & hoop (behind ball when going up)
+  if(!ball||ball.vy<0) drawBackboard();
+
+  // Enemies
+  drawEnemies();
+
+  // Ball trail
+  ballTrail.forEach(t=>{
+    X.fillStyle=`rgba(255,128,0,${t.life})`;
+    X.beginPath();
+    X.arc(t.x,t.y,3*t.life,0,Math.PI*2);
+    X.fill();
+  });
+
+  // Ball in air
+  if(ball&&(shotPhase==='flying'||shotPhase==='scored'||shotPhase==='missed')){
+    drawBall(ball.x,ball.y);
+  }
+
+  // Backboard in front when ball going down
+  if(ball&&ball.vy>=0) drawBackboard();
+  if(!ball) drawBackboard();
+
+  // Spot indicator
+  if(shotPhase==='aim'||shotPhase==='power'){
+    drawSpotIndicator();
+  }
+
+  // Player
+  const spot=SPOTS[spotOrder[Math.min(currentSpot,spotOrder.length-1)]];
+  const shooting=shotPhase==='power'||shotPhase==='flying';
+  shootFrame=shooting?Math.min(shootFrame+0.03,1):0;
+  drawPlayer(currentPlayer,spot.x,spot.y,shooting,shootFrame);
+
+  // Ball in hand
+  if(shotPhase==='aim'||shotPhase==='power'){
+    const facingRight=HOOP.x>spot.x;
+    const bx=spot.x+(facingRight?12:-12);
+    drawBall(bx,spot.y-42,5);
+  }
+
+  // Aim arrow
+  if(shotPhase==='aim'){
+    drawAimArrow(spot.x,spot.y);
+  }
+
+  // Power bar
+  if(shotPhase==='power'){
+    drawPowerBar();
+  }
+
+  // Particles
+  particles.forEach(p=>{
+    X.fillStyle=p.color;
+    X.globalAlpha=Math.max(0,p.life);
+    X.fillRect(p.x,p.y,p.size,p.size);
+  });
+  X.globalAlpha=1;
+
+  // Flash text
+  flashText.forEach(f=>{
+    X.fillStyle=f.color;
+    X.globalAlpha=Math.max(0,f.life);
+    X.font=`bold ${f.size}px Courier New`;
+    X.textAlign='center';
+    X.shadowColor=f.color;X.shadowBlur=10;
+    X.fillText(f.text,f.x,f.y);
+    X.shadowBlur=0;
+  });
+  X.globalAlpha=1;
+
+  // HUD
+  drawHUD();
+
+  // Instructions
+  if(shotPhase==='aim'){
+    X.fillStyle='#aaa';
+    X.font='12px Courier New';
+    X.textAlign='center';
+    X.fillText('Press SPACE to set angle',W/2,H-20);
+  } else if(shotPhase==='power'){
+    X.fillStyle='#aaa';
+    X.font='12px Courier New';
+    X.textAlign='center';
+    X.fillText('Press SPACE to set power (aim for green zone!)',W/2,H-20);
+  }
+}
+
+function gameLoop(ts){
+  const dt=Math.min((ts-lastTime)/1000,0.05);
+  lastTime=ts;
+  update(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// Input
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='Enter') e.preventDefault();
+
+  if(state==='menu'){
+    if(e.code==='ArrowUp'){menuSel=(menuSel-1+3)%3;snd('select');}
+    if(e.code==='ArrowDown'){menuSel=(menuSel+1)%3;snd('select');}
+    if(e.code==='Space'||e.code==='Enter'){
+      AC.resume();
+      snd('select');
+      gameMode=['1v1','solo_mj','solo_curry'][menuSel];
+      if(gameMode==='solo_curry') currentPlayer=1;
+      if(gameMode==='solo_mj'){
+        // Only MJ plays, Curry gets 0
+        maxRounds=1;totalShots=15;
+      } else if(gameMode==='solo_curry'){
+        maxRounds=1;totalShots=15;
+      } else {
+        maxRounds=3;totalShots=10;
+      }
+      startGame();
+    }
+    return;
+  }
+
+  if(state==='result'){
+    if(e.code==='Space'||e.code==='Enter'){
+      startGame();
+    }
+    if(e.code==='Escape'){
+      state='menu';menuSel=0;playMenuMusic();
+    }
+    return;
+  }
+
+  if(state==='playing'){
+    if(e.code==='Space'||e.code==='Enter'){
+      AC.resume();
+      if(shotPhase==='aim'){
+        shotPhase='power';
+        snd('select');
+      } else if(shotPhase==='power'){
+        shotPhase='flying';
+        shootFrame=0;
+        launchBall();
+      }
+    }
+    if(e.code==='Escape'){
+      state='menu';menuSel=0;playMenuMusic();
+    }
+    if(e.code==='KeyM') toggleMusic();
+  }
+
+  // Global mute toggle
+  if(state==='menu'&&e.code==='KeyM') toggleMusic();
+});
+
+// Init
+initCrowd();
+// Start menu music on first click/key (browser policy)
+document.addEventListener('click',function startAudio(){
+  AC.resume().then(()=>playMenuMusic());
+  document.removeEventListener('click',startAudio);
+},{once:false});
+document.addEventListener('keydown',function startAudioK(){
+  AC.resume().then(()=>{if(state==='menu')playMenuMusic();});
+  document.removeEventListener('keydown',startAudioK);
+},{once:false});
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
