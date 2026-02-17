@@ -376,6 +376,7 @@ sfxGain.gain.value=0.5;
 sfxGain.connect(AC.destination);
 
 function snd(type){
+  if(AC.state==='suspended') AC.resume();
   const o=AC.createOscillator(),g=AC.createGain();
   o.connect(g);g.connect(sfxGain);
   const t=AC.currentTime;
@@ -1978,6 +1979,7 @@ function updateTouchUI(){
 function touchBtn(el,code){
   el.addEventListener('touchstart',function(e){
     e.preventDefault();
+    AC.resume(); // Must resume in real user gesture for mobile browsers
     el.classList.add('pressed');
     simulateKey(code);
   },{passive:false});
