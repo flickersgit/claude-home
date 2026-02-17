@@ -25,9 +25,9 @@
   p.sub { color: #888; margin-bottom: 50px; font-size: 16px; }
   .games {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 30px;
-    max-width: 1000px;
+    max-width: 900px;
     width: 100%;
   }
   .card {
@@ -58,32 +58,39 @@
   }
   .card p { color: #999; font-size: 14px; line-height: 1.6; }
   .card .emoji { font-size: 48px; margin-bottom: 12px; }
+  .basket h2 { color: #f80; }
+  .shooter h2 { color: #0f0; }
   .obby h2 { color: #4af; }
   .fighter h2 { color: #f44; }
-  .racing h2 { color: #3f3; }
 </style>
 </head>
 <body>
   <h1>GAME ARCADE</h1>
   <p class="sub">Pick a game and play!</p>
   <div class="games">
+    <a href="retro-basket/" class="card basket">
+      <div class="emoji">🏀</div>
+      <h2>RETRO SHOOTOUT</h2>
+      <span class="tag">Basketball</span>
+      <p>MJ vs Curry shooting competition! Pick your angle & power, dodge defenders, drones, mascots & birds. ON FIRE mode, playoff music, 3 rounds.</p>
+    </a>
+    <a href="retro-shooter/" class="card shooter">
+      <div class="emoji">🚀</div>
+      <h2>GALACTIC DEFENDER</h2>
+      <span class="tag">Space Shooter</span>
+      <p>Retro space shooter with waves of enemies, power-ups, bombs, boss fights every 5 waves, and 8-bit sound effects.</p>
+    </a>
     <a href="obby/" class="card obby">
       <div class="emoji">🏃</div>
       <h2>OBBY</h2>
       <span class="tag">Platformer</span>
-      <p>20-stage obstacle course with wall jumps, ice, bounce pads, conveyor belts, crumbling platforms. Stages 11-20 are HARD MODE.</p>
+      <p>20-stage obstacle course with wall jumps, ice, bounce pads, conveyor belts, crumbling platforms, and more. Stages 11-20 are HARD MODE.</p>
     </a>
     <a href="street-fighter/" class="card fighter">
       <div class="emoji">🥊</div>
       <h2>STREET BRAWL</h2>
       <span class="tag">2P Fighting</span>
       <p>2-player fighting game. Ryu vs Ken with punches, kicks, hadoukens, shoryukens, combos, and special meters. Best of 3 rounds.</p>
-    </a>
-    <a href="retro-racing/" class="card racing">
-      <div class="emoji">🏎️</div>
-      <h2>RETRO RACING</h2>
-      <span class="tag">Racing</span>
-      <p>Turbo edition retro racing. Dodge traffic, collect fuel, survive the night. Arrow keys to steer, hold UP to accelerate.</p>
     </a>
   </div>
 </body>
