@@ -42,7 +42,7 @@ canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radi
 </div>
 <script>
 const C=document.getElementById('game'),X=C.getContext('2d');
-const W=800,H=600;
+const W=450,H=800;
 C.width=W;C.height=H;
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
@@ -440,22 +440,22 @@ let fireTimer=[0,0];
 
 // Positions
 const SPOTS=[
-  {x:150,y:420,label:'CORNER 3',pts:3,diff:0.85},
-  {x:250,y:400,label:'WING 3',pts:3,diff:0.8},
-  {x:400,y:370,label:'TOP KEY',pts:3,diff:0.75},
-  {x:550,y:400,label:'WING 3',pts:3,diff:0.8},
-  {x:650,y:420,label:'CORNER 3',pts:3,diff:0.85},
-  {x:300,y:340,label:'ELBOW',pts:2,diff:0.6},
-  {x:500,y:340,label:'ELBOW',pts:2,diff:0.6},
-  {x:400,y:300,label:'FREE THROW',pts:2,diff:0.5},
-  {x:400,y:250,label:'MID RANGE',pts:2,diff:0.55},
-  {x:400,y:430,label:'HALF COURT',pts:4,diff:0.95},
+  {x:55,y:490,label:'CORNER 3',pts:3,diff:0.85},
+  {x:115,y:460,label:'WING 3',pts:3,diff:0.8},
+  {x:225,y:430,label:'TOP KEY',pts:3,diff:0.75},
+  {x:335,y:460,label:'WING 3',pts:3,diff:0.8},
+  {x:395,y:490,label:'CORNER 3',pts:3,diff:0.85},
+  {x:150,y:390,label:'ELBOW',pts:2,diff:0.6},
+  {x:300,y:390,label:'ELBOW',pts:2,diff:0.6},
+  {x:225,y:350,label:'FREE THROW',pts:2,diff:0.5},
+  {x:225,y:310,label:'MID RANGE',pts:2,diff:0.55},
+  {x:225,y:550,label:'HALF COURT',pts:4,diff:0.95},
 ];
 let currentSpot=0;
 let spotOrder=[];
 
 // Hoop
-const HOOP={x:400,y:140,rimLeft:370,rimRight:430,netBottom:175};
+const HOOP={x:225,y:155,rimLeft:195,rimRight:255,netBottom:190};
 
 // Particles
 let particles=[];
@@ -526,18 +526,18 @@ function createEnemy(type,idx){
   switch(type){
     case'defender':
       return{
-        x:HOOP.rimLeft-40+Math.random()*120,
-        y:200+Math.random()*60,
-        baseY:200+Math.random()*60,
+        x:HOOP.rimLeft-30+Math.random()*90,
+        y:210+Math.random()*50,
+        baseY:210+Math.random()*50,
         vx:(Math.random()>0.5?1:-1)*ENEMY_TYPES.defender.speed,
         vy:0,
         jumping:false,jumpTimer:0,
-        patrolLeft:HOOP.rimLeft-60,
-        patrolRight:HOOP.rimRight+60,
+        patrolLeft:HOOP.rimLeft-50,
+        patrolRight:HOOP.rimRight+50,
       };
     case'drone':
       const fromLeft=Math.random()>0.5;
-      const dy=120+Math.random()*150;
+      const dy=130+Math.random()*120;
       return{
         x:fromLeft?-30:W+30,
         y:dy,
@@ -549,17 +549,17 @@ function createEnemy(type,idx){
       const mFromLeft=Math.random()>0.5;
       return{
         x:mFromLeft?-30:W+30,
-        y:350+Math.random()*80,
+        y:400+Math.random()*80,
         vx:(mFromLeft?1:-1)*ENEMY_TYPES.mascot.speed,
         vy:0,
         wavePhase:0,
-        affectRange:120,
+        affectRange:100,
       };
     case'bird':
       const bFromLeft=Math.random()>0.5;
       return{
         x:bFromLeft?-20:W+20,
-        y:100+Math.random()*200,
+        y:120+Math.random()*180,
         vx:(bFromLeft?1:-1)*ENEMY_TYPES.bird.speed*(1+enemyWave*0.08),
         vy:(Math.random()-0.5)*2,
         flapPhase:0,
@@ -623,7 +623,7 @@ function updateEnemies(dt){
         e.y+=e.vy+Math.sin(e.timer*4)*0.5;
         e.flapPhase+=dt*12;
         // Bounce off top/bottom
-        if(e.y<80||e.y>350) e.vy*=-1;
+        if(e.y<90||e.y>320) e.vy*=-1;
         if(e.x<-40||e.x>W+40) e.active=false;
         break;
     }
@@ -922,10 +922,10 @@ const PLAYERS=[
 
 function initCrowd(){
   crowd=[];
-  for(let i=0;i<60;i++){
+  for(let i=0;i<40;i++){
     crowd.push({
-      x:30+Math.random()*(W-60),
-      y:30+Math.random()*60,
+      x:20+Math.random()*(W-40),
+      y:20+Math.random()*50,
       color:['#CE1141','#1D428A','#FFC72C','#fff','#f80','#0f0','#f0f'][Math.floor(Math.random()*7)],
       phase:Math.random()*Math.PI*2,
       size:3+Math.random()*3,
@@ -988,15 +988,15 @@ function launchBall(){
   if(spotIdx===undefined) return; // safety guard
   const spot=SPOTS[spotIdx];
   const rad=aimAngle*Math.PI/180;
-  const pw=3+powerLevel*0.07;
+  const pw=3.5+powerLevel*0.08;
 
   ball={
     x:spot.x+(currentPlayer===0?-8:8),
     y:spot.y-40,
     vx:Math.cos(rad)*pw,
-    vy:-Math.sin(rad)*pw*1.2,
+    vy:-Math.sin(rad)*pw*1.3,
     radius:6,
-    gravity:0.18,
+    gravity:0.15,
     bounced:false,
     rimHits:0,
     scored:false,
@@ -1057,11 +1057,11 @@ function addFlashText(x,y,text,color,size=20){
 // Drawing
 function drawCourt(){
   // Floor
-  const floorGrad=X.createLinearGradient(0,H*0.6,0,H);
+  const floorGrad=X.createLinearGradient(0,H*0.3,0,H);
   floorGrad.addColorStop(0,'#C67A3C');
   floorGrad.addColorStop(1,'#8B4513');
   X.fillStyle=floorGrad;
-  X.fillRect(0,H*0.55,W,H*0.45);
+  X.fillRect(0,H*0.25,W,H*0.75);
 
   // Court lines
   X.strokeStyle='#fff';
@@ -1070,41 +1070,41 @@ function drawCourt(){
 
   // Three point arc
   X.beginPath();
-  X.ellipse(400,140,230,320,0,0.3*Math.PI,0.7*Math.PI);
+  X.ellipse(225,155,170,310,0,0.25*Math.PI,0.75*Math.PI);
   X.stroke();
 
   // Free throw line area
-  X.strokeRect(310,140,180,220);
+  X.strokeRect(135,155,180,200);
 
   // Center circle area at top
   X.beginPath();
-  X.ellipse(400,140,60,40,0,0,Math.PI);
+  X.ellipse(225,155,50,35,0,0,Math.PI);
   X.stroke();
 
   // Paint
   X.fillStyle='rgba(206,17,65,0.15)';
-  X.fillRect(310,140,180,220);
+  X.fillRect(135,155,180,200);
 
   X.globalAlpha=1;
 
   // Court border lines
   X.strokeStyle='#fff';
   X.lineWidth=3;
-  X.strokeRect(50,100,W-100,H-180);
+  X.strokeRect(20,120,W-40,H-200);
 }
 
 function drawBackboard(){
   // Backboard
   X.fillStyle='#ddd';
-  X.fillRect(365,95,70,8);
+  X.fillRect(190,110,70,8);
   X.strokeStyle='#999';
   X.lineWidth=2;
-  X.strokeRect(365,95,70,8);
+  X.strokeRect(190,110,70,8);
 
   // Backboard square
   X.strokeStyle='#f00';
   X.lineWidth=1;
-  X.strokeRect(380,96,40,6);
+  X.strokeRect(205,111,40,6);
 
   // Rim
   X.strokeStyle='#f60';
@@ -1127,7 +1127,7 @@ function drawBackboard(){
     X.beginPath();
     X.moveTo(nx,HOOP.y+2);
     const sway=Math.sin(Date.now()/500+i)*2;
-    X.quadraticCurveTo(nx+sway,HOOP.y+20,400+(nx-400)*0.4,HOOP.netBottom);
+    X.quadraticCurveTo(nx+sway,HOOP.y+20,225+(nx-225)*0.4,HOOP.netBottom);
     X.stroke();
   }
 }
@@ -1325,7 +1325,7 @@ function drawAimArrow(px,py){
 }
 
 function drawPowerBar(){
-  const bx=50,by=H-60,bw=200,bh=20;
+  const bx=40,by=H-70,bw=W-80,bh=20;
 
   X.fillStyle='#333';
   X.fillRect(bx,by,bw,bh);
@@ -1390,44 +1390,45 @@ function drawSpotIndicator(){
 function drawHUD(){
   // Scoreboard background
   X.fillStyle='rgba(0,0,0,0.7)';
-  X.fillRect(0,0,W,32);
+  X.fillRect(0,0,W,50);
 
   // MJ score
   X.fillStyle=currentPlayer===0?'#ff0':'#CE1141';
-  X.font='bold 14px Courier New';
+  X.font='bold 13px Courier New';
   X.textAlign='left';
-  X.fillText(`MJ #23: ${scores[0]}`,10,22);
+  X.fillText(`MJ: ${scores[0]}`,10,16);
 
   // Curry score
   X.fillStyle=currentPlayer===1?'#ff0':'#1D428A';
   X.textAlign='right';
-  X.fillText(`CURRY #30: ${scores[1]}`,W-10,22);
+  X.fillText(`CURRY: ${scores[1]}`,W-10,16);
 
   // Round
   X.fillStyle='#fff';
   X.textAlign='center';
-  X.fillText(`ROUND ${round}/${maxRounds}`,W/2,14);
+  X.font='bold 11px Courier New';
+  X.fillText(`RD ${round}/${maxRounds}`,W/2,16);
 
   // Shots left
   X.fillStyle='#aaa';
-  X.font='11px Courier New';
-  X.fillText(`SHOTS LEFT: ${shotsLeft[currentPlayer]}`,W/2,26);
+  X.font='10px Courier New';
+  X.fillText(`SHOTS: ${shotsLeft[currentPlayer]}`,W/2,30);
 
   // Current player indicator
   const pName=PLAYERS[currentPlayer].short;
   const pColor=currentPlayer===0?'#CE1141':'#1D428A';
   X.fillStyle=pColor;
-  X.fillRect(W/2-50,34,100,20);
+  X.fillRect(W/2-40,35,80,14);
   X.fillStyle='#fff';
-  X.font='bold 12px Courier New';
+  X.font='bold 10px Courier New';
   X.textAlign='center';
-  X.fillText(pName+"'S TURN",W/2,48);
+  X.fillText(pName+"'S TURN",W/2,46);
 
   // Consecutive hits indicator
   if(consecutiveHits[currentPlayer]>=2){
     X.fillStyle='#f80';
     X.font='bold 10px Courier New';
-    X.fillText(`${consecutiveHits[currentPlayer]} IN A ROW!`,W/2,64);
+    X.fillText(`${consecutiveHits[currentPlayer]} IN A ROW!`,W/2,62);
   }
 
   // Enemy wave indicator
@@ -1473,37 +1474,37 @@ function drawMenu(){
   X.fillRect(0,0,W,H);
 
   // Stars
-  for(let i=0;i<30;i++){
+  for(let i=0;i<20;i++){
     X.fillStyle=`rgba(255,255,255,${0.3+Math.sin(Date.now()/500+i)*0.3})`;
-    X.fillRect(50+i*24+Math.sin(i)*10, 20+Math.sin(i*2.3)*15, 2, 2);
+    X.fillRect(30+i*20+Math.sin(i)*8, 20+Math.sin(i*2.3)*15, 2, 2);
   }
 
   // Title
   X.fillStyle='#f80';
-  X.font='bold 48px Courier New';
+  X.font='bold 36px Courier New';
   X.textAlign='center';
   X.shadowColor='#f80';X.shadowBlur=20;
-  X.fillText('RETRO',W/2,120);
+  X.fillText('RETRO',W/2,100);
   X.fillStyle='#ff0';
   X.shadowColor='#ff0';
-  X.fillText('SHOOTOUT',W/2,170);
+  X.fillText('SHOOTOUT',W/2,145);
   X.shadowBlur=0;
 
   // VS
   X.fillStyle='#fff';
-  X.font='bold 28px Courier New';
-  X.fillText('MJ  vs  CURRY',W/2,220);
+  X.font='bold 22px Courier New';
+  X.fillText('MJ  vs  CURRY',W/2,195);
 
   // Players
-  drawPlayer(0,W/2-120,320,false,0);
-  drawPlayer(1,W/2+120,320,false,0);
+  drawPlayer(0,W/2-80,290,false,0);
+  drawPlayer(1,W/2+80,290,false,0);
 
   // Labels
   X.fillStyle='#CE1141';
-  X.font='bold 14px Courier New';
-  X.fillText('#23 BULLS',W/2-120,380);
+  X.font='bold 12px Courier New';
+  X.fillText('#23 BULLS',W/2-80,345);
   X.fillStyle='#1D428A';
-  X.fillText('#30 WARRIORS',W/2+120,380);
+  X.fillText('#30 WARRIORS',W/2+80,345);
 
   // Menu options
   const opts=[
@@ -1513,20 +1514,20 @@ function drawMenu(){
   ];
 
   opts.forEach((o,i)=>{
-    const y=430+i*50;
+    const y=400+i*55;
     const hover=menuSel===i;
     X.fillStyle=hover?'#ff0':'#888';
-    X.font=`bold ${hover?16:14}px Courier New`;
+    X.font=`bold ${hover?15:13}px Courier New`;
     X.fillText((hover?'> ':'')+o.label+(hover?' <':''),W/2,y);
     X.fillStyle='#666';
-    X.font='11px Courier New';
+    X.font='10px Courier New';
     X.fillText(o.desc,W/2,y+16);
   });
 
   // Controls
   X.fillStyle='#555';
-  X.font='11px Courier New';
-  X.fillText(isTouchDevice?'Use buttons below to play':'[UP/DOWN] Select   [SPACE/ENTER] Start   [M] Music On/Off',W/2,H-20);
+  X.font='10px Courier New';
+  X.fillText(isTouchDevice?'Use buttons below':'[UP/DOWN] Select  [SPACE] Start',W/2,H-20);
 }
 
 let menuSel=0;
@@ -1539,7 +1540,7 @@ function drawResult(){
   const totalB=roundScores[1].reduce((a,b)=>a+b,0);
 
   // Title
-  X.font='bold 36px Courier New';
+  X.font='bold 30px Courier New';
   X.textAlign='center';
   if(totalA>totalB){
     X.fillStyle='#CE1141';
@@ -1558,35 +1559,35 @@ function drawResult(){
 
   // Round breakdown
   X.fillStyle='#fff';
-  X.font='bold 16px Courier New';
+  X.font='bold 14px Courier New';
   X.fillText('ROUND BREAKDOWN',W/2,130);
 
-  X.font='14px Courier New';
+  X.font='12px Courier New';
   X.fillStyle='#aaa';
-  X.fillText('ROUND       MJ    CURRY',W/2,160);
+  X.fillText('RD     MJ   CURRY',W/2,160);
 
   for(let r=0;r<roundScores[0].length;r++){
     X.fillStyle='#fff';
-    X.fillText(`  ${r+1}         ${roundScores[0][r]||0}      ${roundScores[1][r]||0}`,W/2,185+r*25);
+    X.fillText(`${r+1}      ${roundScores[0][r]||0}     ${roundScores[1][r]||0}`,W/2,185+r*25);
   }
 
   X.fillStyle='#ff0';
-  X.font='bold 16px Courier New';
-  X.fillText(`TOTAL:     ${totalA}      ${totalB}`,W/2,185+roundScores[0].length*25+15);
+  X.font='bold 14px Courier New';
+  X.fillText(`TOTAL: ${totalA}     ${totalB}`,W/2,185+roundScores[0].length*25+15);
 
   // Winner character
   const winner=totalA>=totalB?0:1;
-  drawPlayer(winner,W/2,400,false,0);
+  drawPlayer(winner,W/2,420,false,0);
 
   // Restart
   X.fillStyle='#ff0';
-  X.font='bold 16px Courier New';
+  X.font='bold 14px Courier New';
   const blink=Math.sin(Date.now()/300)>0;
-  if(blink) X.fillText(isTouchDevice?'[ TAP TO PLAY AGAIN ]':'[ PRESS SPACE TO PLAY AGAIN ]',W/2,500);
+  if(blink) X.fillText(isTouchDevice?'[ TAP TO PLAY AGAIN ]':'[ SPACE TO PLAY AGAIN ]',W/2,520);
 
   X.fillStyle='#666';
-  X.font='11px Courier New';
-  X.fillText(isTouchDevice?'Use ESC button for Menu':'[ESC] Back to Menu',W/2,530);
+  X.font='10px Courier New';
+  X.fillText(isTouchDevice?'ESC button for Menu':'[ESC] Back to Menu',W/2,550);
 }
 
 // Main update
@@ -1667,7 +1668,7 @@ function update(dt){
     }
 
     // Backboard
-    if(ball.y<105&&ball.y>90&&ball.x>360&&ball.x<440){
+    if(ball.y<120&&ball.y>105&&ball.x>185&&ball.x<265){
       ball.vy=Math.abs(ball.vy)*0.5;
       ball.y=105;
       snd('bounce');
@@ -1710,14 +1711,13 @@ function update(dt){
       else if(ball.rimHits>=2) addFlashText(ball.x,ball.y-50,'LUCKY!','#f80',18);
 
       crowd.forEach(function(c){c.excitement=3;});
-      updateHUD();
       shotPhase='scored';
       shotClock=0;
     }
 
     // Miss - ball goes too low, off screen, or timeout
     var missOffScreen=ball.y>H||ball.x<-50||ball.x>W+50;
-    var missFallingPastRim=ball.y>350&&ball.vy>0&&!ball.scored;
+    var missFallingPastRim=ball.y>400&&ball.vy>0&&!ball.scored;
     var missTimeout=ball.timer>5;
     if(missOffScreen||missFallingPastRim||missTimeout){
       if(!ball.scored){
@@ -1737,8 +1737,8 @@ function update(dt){
       ball.y+=ball.vy;
       ball.vy+=0.3;
       ball.x+=ball.vx*0.9;
-      if(ball.y>H-50){
-        ball.y=H-50;
+      if(ball.y>H-80){
+        ball.y=H-80;
         ball.vy*=-0.4;
         if(Math.abs(ball.vy)>1) snd('bounce');
       }
@@ -1766,11 +1766,11 @@ function render(){
   }
 
   // Sky / arena background
-  const skyGrad=X.createLinearGradient(0,0,0,H*0.55);
+  const skyGrad=X.createLinearGradient(0,0,0,H*0.3);
   skyGrad.addColorStop(0,'#1a0a2e');
   skyGrad.addColorStop(1,'#2d1b4e');
   X.fillStyle=skyGrad;
-  X.fillRect(0,0,W,H*0.55);
+  X.fillRect(0,0,W,H*0.3);
 
   // Crowd
   drawCrowd();
@@ -1857,12 +1857,12 @@ function render(){
     X.fillStyle='#aaa';
     X.font='12px Courier New';
     X.textAlign='center';
-    X.fillText(isTouchDevice?'Tap to set angle':'Press SPACE to set angle',W/2,H-20);
+    X.fillText(isTouchDevice?'Tap to set angle':'SPACE to set angle',W/2,H-20);
   } else if(shotPhase==='power'){
     X.fillStyle='#aaa';
-    X.font='12px Courier New';
+    X.font='11px Courier New';
     X.textAlign='center';
-    X.fillText(isTouchDevice?'Tap to set power (aim for green zone!)':'Press SPACE to set power (aim for green zone!)',W/2,H-20);
+    X.fillText(isTouchDevice?'Tap to shoot!':'SPACE to shoot!',W/2,H-20);
   }
 }
 
