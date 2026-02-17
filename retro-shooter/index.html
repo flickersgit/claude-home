@@ -184,11 +184,18 @@ h2 {
   touch-action: none;
 }
 @media (pointer: coarse) {
+  body { align-items: flex-start; padding-top: env(safe-area-inset-top, 0px); }
   #touchControls { display: block; }
   #btn-pause { display: flex; }
   #hud { font-size: 13px; padding: 8px 12px; }
   .controls { display: none; }
   .blink { font-size: 18px; padding: 16px 24px; }
+}
+@media (max-width: 480px) {
+  h1 { font-size: 32px; letter-spacing: 2px; }
+  .subtitle { font-size: 12px; margin-bottom: 20px; }
+  #finalScore { font-size: 20px; }
+  #finalWave { font-size: 16px; }
 }
 </style>
 </head>
@@ -240,7 +247,9 @@ canvas.width = W; canvas.height = H;
 
 // Scale canvas to fit screen
 function resize() {
-  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  const availH = isMobile ? window.innerHeight - 170 : window.innerHeight;
+  const scale = Math.min(window.innerWidth / W, availH / H);
   canvas.style.width = W * scale + 'px';
   canvas.style.height = H * scale + 'px';
 }
