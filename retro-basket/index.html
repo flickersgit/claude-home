@@ -415,6 +415,50 @@ function snd(type){
       o.type='square';o.frequency.setValueAtTime(600,t);o.frequency.exponentialRampToValueAtTime(900,t+0.08);
       g.gain.setValueAtTime(0.1,t);g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
       o.start(t);o.stop(t+0.1);break;
+    case'crowd_cheer':
+      // Layer 1: rising roar (main voice)
+      o.type='sawtooth';o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(500,t+0.3);
+      o.frequency.exponentialRampToValueAtTime(400,t+0.7);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.12,t+0.1);
+      g.gain.setValueAtTime(0.12,t+0.3);g.gain.exponentialRampToValueAtTime(0.01,t+0.8);
+      o.start(t);o.stop(t+0.8);
+      // Layer 2: high crowd shimmer
+      (function(){var o2=AC.createOscillator(),g2=AC.createGain();
+      o2.connect(g2);g2.connect(sfxGain);
+      o2.type='sawtooth';o2.frequency.setValueAtTime(350,t);o2.frequency.exponentialRampToValueAtTime(700,t+0.2);
+      o2.frequency.exponentialRampToValueAtTime(550,t+0.7);
+      g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(0.08,t+0.15);
+      g2.gain.exponentialRampToValueAtTime(0.01,t+0.7);
+      o2.start(t);o2.stop(t+0.7);})();
+      // Layer 3: rumble undertone
+      (function(){var o3=AC.createOscillator(),g3=AC.createGain();
+      o3.connect(g3);g3.connect(sfxGain);
+      o3.type='triangle';o3.frequency.setValueAtTime(100,t);o3.frequency.exponentialRampToValueAtTime(180,t+0.3);
+      g3.gain.setValueAtTime(0,t);g3.gain.linearRampToValueAtTime(0.1,t+0.1);
+      g3.gain.exponentialRampToValueAtTime(0.01,t+0.6);
+      o3.start(t);o3.stop(t+0.6);})();
+      break;
+    case'crowd_groan':
+      // Layer 1: descending disappointed "aww"
+      o.type='sawtooth';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(120,t+0.5);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.1,t+0.08);
+      g.gain.setValueAtTime(0.1,t+0.2);g.gain.exponentialRampToValueAtTime(0.01,t+0.6);
+      o.start(t);o.stop(t+0.6);
+      // Layer 2: low grumble
+      (function(){var o2=AC.createOscillator(),g2=AC.createGain();
+      o2.connect(g2);g2.connect(sfxGain);
+      o2.type='triangle';o2.frequency.setValueAtTime(180,t);o2.frequency.exponentialRampToValueAtTime(80,t+0.5);
+      g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(0.08,t+0.1);
+      g2.gain.exponentialRampToValueAtTime(0.01,t+0.55);
+      o2.start(t);o2.stop(t+0.55);})();
+      // Layer 3: sad descending tone
+      (function(){var o3=AC.createOscillator(),g3=AC.createGain();
+      o3.connect(g3);g3.connect(sfxGain);
+      o3.type='square';o3.frequency.setValueAtTime(250,t+0.05);o3.frequency.exponentialRampToValueAtTime(100,t+0.45);
+      g3.gain.setValueAtTime(0,t);g3.gain.linearRampToValueAtTime(0.05,t+0.1);
+      g3.gain.exponentialRampToValueAtTime(0.01,t+0.5);
+      o3.start(t+0.05);o3.stop(t+0.5);})();
+      break;
   }
 }
 
@@ -1701,6 +1745,7 @@ function update(dt){
       }
 
       snd('swish');
+      snd('crowd_cheer');
       spawnParticles(ball.x,ball.y,'#ff0',20,4);
       spawnParticles(ball.x,ball.y,'#fff',10,3);
 
@@ -1726,6 +1771,8 @@ function update(dt){
         consecutiveHits[currentPlayer]=0;
         if(onFire[currentPlayer]){onFire[currentPlayer]=false;playGameMusic();}
         snd('miss');
+        snd('crowd_groan');
+        crowd.forEach(function(c){c.excitement=1;});
         addFlashText(Math.max(30,Math.min(ball.x,W-30)),Math.min(ball.y,H-50),'MISS!','#f44',20);
         shotPhase='missed';
         shotClock=0;
