@@ -28,19 +28,16 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 160px;
+    height: 180px;
     z-index: 30;
     pointer-events: none;
   }
   #touch-controls button {
     position: absolute;
-    width: 65px;
-    height: 65px;
     border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.4);
     background: rgba(255,255,255,0.15);
     color: rgba(255,255,255,0.8);
-    font-size: 24px;
     font-weight: bold;
     pointer-events: auto;
     touch-action: manipulation;
@@ -55,10 +52,45 @@
   #touch-controls button:active {
     background: rgba(255,255,255,0.35);
   }
-  #btn-left { bottom: 20px; left: 20px; }
-  #btn-right { bottom: 20px; left: 100px; }
-  #btn-jump { bottom: 20px; right: 20px; width: 80px; height: 80px; font-size: 16px; }
-  #btn-restart { bottom: 115px; right: 28px; width: 50px; height: 50px; font-size: 12px; }
+  #btn-jump { bottom: 25px; right: 20px; width: 85px; height: 85px; font-size: 16px; }
+  #btn-restart { bottom: 125px; right: 28px; width: 50px; height: 50px; font-size: 12px; }
+  /* Virtual joystick */
+  #joystick-zone {
+    position: absolute;
+    left: 10px;
+    bottom: 15px;
+    width: 150px;
+    height: 150px;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  #joystick-base {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+  }
+  #joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 54px;
+    height: 54px;
+    margin-left: -27px;
+    margin-top: -27px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.13);
+    transition: background 0.1s;
+  }
+  #joystick-knob.active {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.8);
+  }
   @media (pointer: coarse) {
     #touch-controls { display: block; }
     #controls { display: none; }
@@ -145,8 +177,11 @@
 <canvas id="game"></canvas>
 
 <div id="touch-controls">
-  <button id="btn-left">&#9664;</button>
-  <button id="btn-right">&#9654;</button>
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
   <button id="btn-jump">JUMP</button>
   <button id="btn-restart">R</button>
 </div>
@@ -186,10 +221,76 @@ function bindTouch(btnId, keyCode) {
   btn.addEventListener('touchend', e => { e.preventDefault(); keys[keyCode] = false; }, { passive: false });
   btn.addEventListener('touchcancel', e => { keys[keyCode] = false; });
 }
-bindTouch('btn-left', 'ArrowLeft');
-bindTouch('btn-right', 'ArrowRight');
 bindTouch('btn-jump', 'Space');
 bindTouch('btn-restart', 'KeyR');
+
+// --- Virtual Joystick ---
+const joystickZone = document.getElementById('joystick-zone');
+const joystickBase = document.getElementById('joystick-base');
+const joystickKnob = document.getElementById('joystick-knob');
+const JOYSTICK_RADIUS = 65;
+const DEADZONE = 0.18;
+let joystickX = 0;
+let joystickTouchId = null;
+
+function updateJoystick(clientX, clientY) {
+  const rect = joystickBase.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  let offX = clientX - centerX;
+  let offY = clientY - centerY;
+  // Clamp to radius
+  const dist = Math.sqrt(offX * offX + offY * offY);
+  if (dist > JOYSTICK_RADIUS) {
+    offX = offX / dist * JOYSTICK_RADIUS;
+    offY = offY / dist * JOYSTICK_RADIUS;
+  }
+  // Visual knob movement
+  joystickKnob.style.marginLeft = (-27 + offX) + 'px';
+  joystickKnob.style.marginTop = (-27 + offY) + 'px';
+  // Normalize X to -1..1 with deadzone
+  const nx = offX / JOYSTICK_RADIUS;
+  joystickX = Math.abs(nx) > DEADZONE ? nx : 0;
+}
+
+function resetJoystick() {
+  joystickKnob.style.marginLeft = '-27px';
+  joystickKnob.style.marginTop = '-27px';
+  joystickKnob.classList.remove('active');
+  joystickX = 0;
+  joystickTouchId = null;
+}
+
+joystickZone.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  joystickTouchId = touch.identifier;
+  joystickKnob.classList.add('active');
+  updateJoystick(touch.clientX, touch.clientY);
+}, { passive: false });
+
+joystickZone.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === joystickTouchId) {
+      updateJoystick(touch.clientX, touch.clientY);
+      break;
+    }
+  }
+}, { passive: false });
+
+joystickZone.addEventListener('touchend', e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === joystickTouchId) {
+      resetJoystick();
+      break;
+    }
+  }
+}, { passive: false });
+
+joystickZone.addEventListener('touchcancel', e => {
+  resetJoystick();
+}, { passive: false });
 
 // Tap canvas to restart on win screen
 let winTapRestart = false;
@@ -748,10 +849,11 @@ function updatePlayer() {
   const accel = onIce ? 0.15 : ACCEL;
   const fric = onIce ? 0.97 : FRICTION;
 
-  // Horizontal
+  // Horizontal (keyboard + joystick)
   let inputX = 0;
   if (keys['ArrowLeft'] || keys['KeyA']) inputX = -1;
   if (keys['ArrowRight'] || keys['KeyD']) inputX = 1;
+  if (joystickX !== 0) inputX = joystickX;
   player.vx += inputX * accel + conveyorPush * 0.1;
   if (!inputX && !conveyorPush) player.vx *= fric;
   else if (!inputX && conveyorPush) player.vx = player.vx * 0.9 + conveyorPush * 0.15;
