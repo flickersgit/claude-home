@@ -117,31 +117,42 @@ h2 {
   background: rgba(255,255,255,0.3);
   border-color: rgba(255,255,255,0.7);
 }
-/* D-pad buttons - left side */
-#btn-left {
-  left: 16px;
-  bottom: 50px;
-  width: 64px;
-  height: 64px;
+/* Virtual joystick - left side */
+#joystick-zone {
+  position: absolute;
+  left: 10px;
+  bottom: 20px;
+  width: 140px;
+  height: 140px;
+  pointer-events: all;
+  touch-action: none;
 }
-#btn-right {
-  left: 96px;
-  bottom: 50px;
-  width: 64px;
-  height: 64px;
+#joystick-base {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.05);
 }
-#btn-up {
-  left: 56px;
-  bottom: 120px;
-  width: 64px;
-  height: 64px;
+#joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  margin-left: -25px;
+  margin-top: -25px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.15);
+  transition: background 0.1s;
 }
-#btn-down {
-  left: 56px;
-  bottom: -20px;
-  width: 64px;
-  height: 64px;
-  display: none; /* hide down by default, less useful in shooters */
+#joystick-knob.active {
+  background: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.8);
 }
 /* Action buttons - right side */
 #btn-fire {
@@ -231,9 +242,11 @@ h2 {
 </div>
 
 <div id="touchControls">
-  <div id="btn-left" class="touch-btn">&larr;</div>
-  <div id="btn-right" class="touch-btn">&rarr;</div>
-  <div id="btn-up" class="touch-btn">&uarr;</div>
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
   <div id="btn-fire" class="touch-btn">FIRE</div>
   <div id="btn-bomb" class="touch-btn">BOMB</div>
 </div>
@@ -265,6 +278,7 @@ let waveTimer = 0, waveEnemiesLeft = 0;
 let keys = {};
 let shootCooldown = 0, powerLevel = 0, powerTimer = 0;
 let invincibleTimer = 0;
+let joystickX = 0, joystickY = 0; // -1 to 1, from virtual joystick
 
 // Audio (Web Audio API - retro sounds)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -624,14 +638,21 @@ function gameLoop(timestamp) {
 }
 
 function update(dt) {
-  // Player movement
+  // Player movement (keyboard + joystick)
   let dx = 0, dy = 0;
   if (keys['ArrowLeft'] || keys['KeyA']) dx = -1;
   if (keys['ArrowRight'] || keys['KeyD']) dx = 1;
   if (keys['ArrowUp'] || keys['KeyW']) dy = -1;
   if (keys['ArrowDown'] || keys['KeyS']) dy = 1;
 
-  if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+  // Apply joystick input (overrides keyboard if joystick active)
+  if (joystickX !== 0 || joystickY !== 0) {
+    dx = joystickX;
+    dy = joystickY;
+  }
+
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag > 1) { dx /= mag; dy /= mag; }
   player.x += dx * player.speed;
   player.y += dy * player.speed;
   player.x = Math.max(20, Math.min(W - 20, player.x));
@@ -951,38 +972,111 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   if (!isTouchDevice) return;
 
-  // Map touch buttons to key codes used by the game
-  const btnKeyMap = {
-    'btn-left':  'ArrowLeft',
-    'btn-right': 'ArrowRight',
-    'btn-up':    'ArrowUp',
-    'btn-fire':  'Space',
-  };
+  // Virtual joystick
+  const joystickZone = document.getElementById('joystick-zone');
+  const joystickBase = document.getElementById('joystick-base');
+  const joystickKnob = document.getElementById('joystick-knob');
+  let joystickTouchId = null;
+  const JOYSTICK_RADIUS = 35; // max knob travel from center
+  const DEADZONE = 0.15;
 
-  // Set up hold-style buttons (movement + fire)
-  Object.keys(btnKeyMap).forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const keyCode = btnKeyMap[id];
+  function getJoystickCenter() {
+    const rect = joystickBase.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
 
-    el.addEventListener('touchstart', e => {
+  function updateJoystick(touchX, touchY) {
+    const center = getJoystickCenter();
+    let offX = touchX - center.x;
+    let offY = touchY - center.y;
+    const dist = Math.sqrt(offX * offX + offY * offY);
+
+    // Clamp to joystick radius
+    if (dist > JOYSTICK_RADIUS) {
+      offX = (offX / dist) * JOYSTICK_RADIUS;
+      offY = (offY / dist) * JOYSTICK_RADIUS;
+    }
+
+    // Move knob visually
+    joystickKnob.style.marginLeft = (-25 + offX) + 'px';
+    joystickKnob.style.marginTop = (-25 + offY) + 'px';
+
+    // Normalize to -1..1
+    const nx = offX / JOYSTICK_RADIUS;
+    const ny = offY / JOYSTICK_RADIUS;
+
+    // Apply deadzone
+    joystickX = Math.abs(nx) > DEADZONE ? nx : 0;
+    joystickY = Math.abs(ny) > DEADZONE ? ny : 0;
+  }
+
+  function resetJoystick() {
+    joystickKnob.style.marginLeft = '-25px';
+    joystickKnob.style.marginTop = '-25px';
+    joystickKnob.classList.remove('active');
+    joystickX = 0;
+    joystickY = 0;
+    joystickTouchId = null;
+  }
+
+  joystickZone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (joystickTouchId === null) {
+      const touch = e.changedTouches[0];
+      joystickTouchId = touch.identifier;
+      joystickKnob.classList.add('active');
+      updateJoystick(touch.clientX, touch.clientY);
+    }
+  }, { passive: false });
+
+  joystickZone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === joystickTouchId) {
+        updateJoystick(touch.clientX, touch.clientY);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  joystickZone.addEventListener('touchend', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchId) {
+        resetJoystick();
+        break;
+      }
+    }
+  }, { passive: false });
+
+  joystickZone.addEventListener('touchcancel', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchId) {
+        resetJoystick();
+        break;
+      }
+    }
+  }, { passive: false });
+
+  // Fire button
+  const btnFire = document.getElementById('btn-fire');
+  if (btnFire) {
+    btnFire.addEventListener('touchstart', e => {
       e.preventDefault();
-      keys[keyCode] = true;
-      el.classList.add('active');
+      keys['Space'] = true;
+      btnFire.classList.add('active');
     }, { passive: false });
-
-    el.addEventListener('touchend', e => {
+    btnFire.addEventListener('touchend', e => {
       e.preventDefault();
-      keys[keyCode] = false;
-      el.classList.remove('active');
+      keys['Space'] = false;
+      btnFire.classList.remove('active');
     }, { passive: false });
-
-    el.addEventListener('touchcancel', e => {
+    btnFire.addEventListener('touchcancel', e => {
       e.preventDefault();
-      keys[keyCode] = false;
-      el.classList.remove('active');
+      keys['Space'] = false;
+      btnFire.classList.remove('active');
     }, { passive: false });
-  });
+  }
 
   // Bomb button - single press action
   const btnBomb = document.getElementById('btn-bomb');
@@ -1032,11 +1126,14 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
     }
   }, { passive: false });
 
-  // Handle multi-touch: if finger slides off a button, release it
-  // This ensures clean state when fingers move between buttons
-  document.addEventListener('touchmove', e => {
-    // For each active touch, check if still over its original button
-    // Not strictly needed but prevents stuck keys in edge cases
+  // Handle global touchend to reset joystick if finger leaves zone
+  document.addEventListener('touchend', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchId) {
+        resetJoystick();
+        break;
+      }
+    }
   }, { passive: true });
 })();
 
