@@ -14,6 +14,21 @@ This project serves as the central configuration hub for setting up Claude Code 
 
 ---
 
+## Projects
+
+### Game Arcade (`game-arcade.graciebelle.cc`)
+
+- **Directory**: `/Users/statpods/Documents/Claude Home`
+- **Cloudflare Pages project**: `game-arcade`
+- **Git remote**: `https://github.com/flickersgit/claude-home.git` (NOT linked to Cloudflare — no auto-deploy)
+- **Deploy command**:
+  ```bash
+  wrangler pages deploy . --project-name game-arcade
+  ```
+- After deploying, confirm at `game-arcade.graciebelle.cc`
+
+---
+
 ## Workflow Instructions
 
 ### On Session Start (REQUIRED)
