@@ -24,3 +24,8 @@ node_modules/
 *.mp4
 concat_list.txt
 screenshots/
+
+# WhatsApp bridge runtime files
+whatsapp-bridge/.wwebjs_auth/
+whatsapp-bridge/logs/
+whatsapp-bridge/sessions.json

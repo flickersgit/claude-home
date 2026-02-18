@@ -49,10 +49,13 @@ function getName(chatId) {
 
 console.log(`[boot] Starting Mochi... Owner: ${OWNER_NUMBER}, allowed: ${ALLOWED_NUMBERS.size} number(s)`);
 
+// Phone pairing: international number without + e.g. "6580735469"
+const PAIRING_PHONE = (process.env.PAIRING_PHONE || '').replace(/\D/g, '');
+
 // ---------------------------------------------------------------------------
 // WhatsApp client
 // ---------------------------------------------------------------------------
-const client = new Client({
+const clientOpts = {
   authStrategy: new LocalAuth({
     clientId: 'mochi',
     dataPath: './.wwebjs_auth',
@@ -68,13 +71,26 @@ const client = new Client({
       '--disable-dev-shm-usage',
     ],
   },
-});
+};
+
+if (PAIRING_PHONE) {
+  clientOpts.pairWithPhoneNumber = { phoneNumber: PAIRING_PHONE };
+}
+
+const client = new Client(clientOpts);
 
 // ---------------------------------------------------------------------------
 // Auth / lifecycle events
 // ---------------------------------------------------------------------------
+// Phone-number pairing — code arrives via 'code' event, not 'qr'
+client.on('code', (code) => {
+  console.log(`[auth] Pairing code: ${code}`);
+  console.log('[auth] On your phone: WhatsApp → Settings → Linked Devices → Link a Device → Link with phone number instead');
+});
+
 let qrServer = null;
 client.on('qr', async (qr) => {
+  // Fallback: QR code in browser (only fires when pairWithPhoneNumber is not set)
   console.log('[auth] QR code ready — opening in browser...');
   const dataUrl = await QRCode.toDataURL(qr, { width: 400, margin: 2 });
   const html = `<!DOCTYPE html><html><head><title>Mochi QR</title>

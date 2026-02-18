@@ -1,0 +1,12 @@
+whatsapp-bridge/
+.wwebjs_auth/
+node_modules/
+.git/
+memory_log/
+docs/
+analytics-project-template/
+.claude/
+package.json
+package-lock.json
+CLAUDE.md
+AGENTS.md

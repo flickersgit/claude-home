@@ -13,7 +13,8 @@ retro-shooter, retro-racing (Void Runner), retro-paddle (Neon Breaker), galactic
 - Mobile-first — all games must work on phone browsers
 - Never use `git add -A` or `git add .` — always add files explicitly by name
 - Commit message format: `feat: <description>`
-- After committing and pushing, deploy to staging: `wrangler pages deploy . --project-name game-arcade --branch staging`
+- Before deploying, remove Chrome lock symlinks: `find whatsapp-bridge/.wwebjs_auth -type l -delete 2>/dev/null; true`
+- After committing and pushing, deploy to staging: `wrangler pages deploy . --project-name game-arcade --branch staging --commit-dirty=true`
 - Do NOT commit: whatsapp-bridge/MEMORY.md, whatsapp-bridge/SOUL.md, whatsapp-bridge/HEARTBEAT.md
 
 ## Output format (always end your response with these lines)
