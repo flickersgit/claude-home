@@ -15,6 +15,9 @@ body {
   overflow: hidden;
   font-family: 'Courier New', monospace;
 }
+@supports (height: 100dvh) {
+  body { height: 100dvh; }
+}
 canvas { display: block; image-rendering: pixelated; touch-action: none; }
 .home-btn {
   position: fixed; top: 10px; right: 60px; z-index: 999;
