@@ -78,16 +78,6 @@ function stopMusic(){
   musicPlaying=null;
 }
 
-function createOsc(type,freq,gainVal,dest){
-  const o=AC.createOscillator();
-  const g=AC.createGain();
-  o.type=type;
-  o.frequency.value=freq;
-  g.gain.value=gainVal;
-  o.connect(g);
-  g.connect(dest||masterGain);
-  return{osc:o,gain:g};
-}
 
 // Lookahead scheduler: only schedule a few loops ahead, then keep topping up
 const SCHEDULE_AHEAD=4; // loops to schedule ahead
@@ -509,6 +499,7 @@ let enemies=[];
 let enemyWave=0;
 let enemySpawnTimer=0;
 let enemiesKilled=0;
+let resultMusicTimeout=null;
 
 const ENEMY_TYPES={
   // Defender: patrols near the rim, jumps to block shots
@@ -938,17 +929,6 @@ function drawEnemies(){
 }
 
 // SFX for enemies
-function sndBlock(){
-  const o=AC.createOscillator(),g=AC.createGain();
-  o.connect(g);g.connect(sfxGain);
-  const t=AC.currentTime;
-  o.type='sawtooth';
-  o.frequency.setValueAtTime(300,t);
-  o.frequency.exponentialRampToValueAtTime(80,t+0.15);
-  g.gain.setValueAtTime(0.2,t);
-  g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
-  o.start(t);o.stop(t+0.2);
-}
 
 // Characters
 const PLAYERS=[
@@ -1004,6 +984,7 @@ function startGame(){
   enemyWave=0;
   enemySpawnTimer=0;
   enemiesKilled=0;
+  if(resultMusicTimeout){clearTimeout(resultMusicTimeout);resultMusicTimeout=null;}
   shuffleSpots();
   currentSpot=0;
   startShot();
@@ -1076,7 +1057,7 @@ function nextTurn(){
       } else {
         state='result';
         snd('buzzer');
-        setTimeout(()=>playResultMusic(),800);
+        resultMusicTimeout=setTimeout(()=>{resultMusicTimeout=null;playResultMusic();},800);
       }
     }
   } else {
@@ -1085,7 +1066,8 @@ function nextTurn(){
 }
 
 function spawnParticles(x,y,color,count,spd=3){
-  for(let i=0;i<count;i++){
+  const MAX=300;
+  for(let i=0;i<count&&particles.length<MAX;i++){
     const a=Math.random()*Math.PI*2;
     const s=(0.5+Math.random())*spd;
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,size:2+Math.random()*3});

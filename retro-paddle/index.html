@@ -235,7 +235,7 @@ let state = 'menu';
 let score = 0;
 let lives = 3;
 let level = 1;
-let highScore = parseInt(localStorage.getItem('neonBreakerHigh') || '0');
+let highScore = parseInt(localStorage.getItem('neonBreakerHigh') || '0') || 0;
 let frameCount = 0;
 let combo = 0;
 let shakeTimer = 0;
@@ -806,14 +806,13 @@ function draw() {
 
     // Glow
     ctx.fillStyle = br.color.replace(')', ',' + glow + ')').replace('rgb', 'rgba').replace('#', '');
-    // Use shadow for glow
-    ctx.shadowColor = br.color;
-    ctx.shadowBlur = 8;
+    // Manual glow (no shadowBlur for performance)
     ctx.fillStyle = br.color;
+    ctx.globalAlpha = (0.3 + alpha * 0.7) * 0.2;
+    ctx.fillRect(br.x - 3, br.y - 3, br.w + 6, br.h + 6);
     ctx.globalAlpha = 0.3 + alpha * 0.7;
     ctx.fillRect(br.x, br.y, br.w, br.h);
     ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
 
     // Brick body
     ctx.fillStyle = br.color;
@@ -960,10 +959,14 @@ function draw() {
   ctx.restore();
 }
 
-function gameLoop() {
+let lastFrameTime = 0;
+const FRAME_MIN = 1000 / 65; // cap at ~60fps for consistent physics
+function gameLoop(timestamp) {
+  requestAnimationFrame(gameLoop);
+  if (timestamp - lastFrameTime < FRAME_MIN) return;
+  lastFrameTime = timestamp;
   update();
   draw();
-  requestAnimationFrame(gameLoop);
 }
 
 // Start
@@ -974,7 +977,7 @@ startBtn.addEventListener('click', () => {
   overlay.classList.add('hidden');
 });
 
-gameLoop();
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>

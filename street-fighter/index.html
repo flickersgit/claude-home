@@ -272,6 +272,7 @@ const ROUND_TIME = 90;
 
 // ---- State ----
 let gameState = 'menu'; // menu, countdown, fighting, roundEnd, matchEnd
+let roundTransitionTimeout = null;
 let countdownTimer = 0;
 let roundTimer = 0;
 let roundStartTime = 0;
@@ -560,12 +561,14 @@ function updateProjectiles() {
     pr.x += pr.vx;
     pr.life--;
 
-    // Trail
-    particles.push({
-      x: pr.x + pr.w / 2, y: pr.y + pr.h / 2,
-      vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-      life: 15, color: pr.color, size: 4 + Math.random() * 4,
-    });
+    // Trail (throttled, capped)
+    if (particles.length < 300 && pr.life % 3 === 0) {
+      particles.push({
+        x: pr.x + pr.w / 2, y: pr.y + pr.h / 2,
+        vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+        life: 15, color: pr.color, size: 4 + Math.random() * 4,
+      });
+    }
 
     if (pr.life <= 0 || pr.x < -50 || pr.x > W + 50) {
       projectiles.splice(i, 1);
@@ -1079,7 +1082,8 @@ function checkRoundEnd() {
   }
 
   // Check match
-  setTimeout(() => {
+  roundTransitionTimeout = setTimeout(() => {
+    roundTransitionTimeout = null;
     if (p1Wins >= ROUND_WIN) {
       announce('RYU IS THE CHAMPION!', 250);
       gameState = 'matchEnd';
@@ -1094,8 +1098,12 @@ function checkRoundEnd() {
 }
 
 // ---- Main Loop ----
-function loop() {
+let lastFrameTime = 0;
+const FRAME_MIN = 1000 / 65; // cap at ~60fps for consistent physics
+function loop(timestamp) {
   requestAnimationFrame(loop);
+  if (timestamp - lastFrameTime < FRAME_MIN) return;
+  lastFrameTime = timestamp;
 
   if (gameState === 'menu') {
     drawBg();
@@ -1160,6 +1168,7 @@ function loop() {
   if (gameState === 'matchEnd') {
     if (keys['Space'] || touchRestart) {
       touchRestart = false;
+      if (roundTransitionTimeout) { clearTimeout(roundTransitionTimeout); roundTransitionTimeout = null; }
       p1Wins = 0; p2Wins = 0; currentRound = 1;
       startRound();
     }
@@ -1197,7 +1206,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
   startRound();
 });
 
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>

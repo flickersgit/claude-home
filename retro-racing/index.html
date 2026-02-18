@@ -213,7 +213,7 @@ const boostBarFill = document.getElementById('boostBarFill');
 // Game state
 let state = 'menu';
 let score = 0;
-let highScore = parseInt(localStorage.getItem('voidRunnerHigh') || '0');
+let highScore = parseInt(localStorage.getItem('voidRunnerHigh') || '0') || 0;
 let shield = 3;
 let speed = 0;
 let maxSpeed = 14;
@@ -318,18 +318,47 @@ function resetJoystick() {
 
 // Touch double-tap for boost
 let lastTapTime = 0;
+let joystickTouchId = null;
 joystickBase.addEventListener('touchstart', e => {
   e.preventDefault();
-  joystickActive = true;
-  handleJoystick(e.touches[0].clientX, e.touches[0].clientY);
+  if (joystickTouchId === null) {
+    const touch = e.changedTouches[0];
+    joystickTouchId = touch.identifier;
+    joystickActive = true;
+    handleJoystick(touch.clientX, touch.clientY);
+  }
   const now = Date.now();
   if (now - lastTapTime < 300) { activateBoost(); }
   lastTapTime = now;
 });
 document.addEventListener('touchmove', e => {
-  if (joystickActive) { e.preventDefault(); handleJoystick(e.touches[0].clientX, e.touches[0].clientY); }
+  if (joystickTouchId === null) return;
+  for (let i = 0; i < e.touches.length; i++) {
+    if (e.touches[i].identifier === joystickTouchId) {
+      e.preventDefault();
+      handleJoystick(e.touches[i].clientX, e.touches[i].clientY);
+      break;
+    }
+  }
 }, { passive: false });
-document.addEventListener('touchend', () => { if (joystickActive) resetJoystick(); });
+document.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joystickTouchId) {
+      joystickTouchId = null;
+      resetJoystick();
+      break;
+    }
+  }
+});
+document.addEventListener('touchcancel', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joystickTouchId) {
+      joystickTouchId = null;
+      resetJoystick();
+      break;
+    }
+  }
+});
 
 joystickBase.addEventListener('mousedown', e => {
   e.preventDefault(); joystickActive = true; handleJoystick(e.clientX, e.clientY);
@@ -420,7 +449,8 @@ function spawnEnergy() {
 }
 
 function addParticle(x, y, color, count, opts = {}) {
-  for (let i = 0; i < count; i++) {
+  const MAX_PARTICLES = 300;
+  for (let i = 0; i < count && particles.length < MAX_PARTICLES; i++) {
     particles.push({
       x, y,
       vx: (opts.vx || 0) + (Math.random() - 0.5) * (opts.spread || 8),
@@ -1256,7 +1286,7 @@ function update() {
   }
 
   // Collision: rivals
-  if (invincibleTimer <= 0) {
+  if (invincibleTimer <= 0 && state === 'playing') {
     for (let i = rivalShips.length - 1; i >= 0; i--) {
       const r = rivalShips[i];
       if (Math.abs(player.x - r.x) < (player.w + r.w) / 2 - 4 &&
@@ -1446,10 +1476,14 @@ function draw() {
   ctx.restore();
 }
 
-function gameLoop() {
+let lastFrameTime = 0;
+const FRAME_MIN = 1000 / 65; // cap at ~60fps for consistent physics
+function gameLoop(timestamp) {
+  requestAnimationFrame(gameLoop);
+  if (timestamp - lastFrameTime < FRAME_MIN) return;
+  lastFrameTime = timestamp;
   update();
   draw();
-  requestAnimationFrame(gameLoop);
 }
 
 // Start
@@ -1459,7 +1493,7 @@ startBtn.addEventListener('click', () => {
   overlay.classList.add('hidden');
 });
 
-gameLoop();
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>

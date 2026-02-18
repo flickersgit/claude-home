@@ -305,7 +305,12 @@ joystickZone.addEventListener('touchend', e => {
 }, { passive: false });
 
 joystickZone.addEventListener('touchcancel', e => {
-  resetJoystick();
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joystickTouchId) {
+      resetJoystick();
+      break;
+    }
+  }
 }, { passive: false });
 
 // Tap canvas to restart on win screen
@@ -789,6 +794,7 @@ let platforms = [];
 let lavaBlocks = [];
 let movingData = [];
 let particles = [];
+const MAX_PARTICLES = 300;
 let textPopups = [];
 
 function loadStage(idx) {
@@ -816,7 +822,7 @@ function die() {
   deaths++;
   document.getElementById('deathCount').textContent = deaths;
   // Death particles
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 20 && particles.length < MAX_PARTICLES; i++) {
     particles.push({
       x: player.x + player.w / 2,
       y: player.y + player.h / 2,
@@ -947,7 +953,7 @@ function updatePlayer() {
     if (collides(player, p)) {
       if (p.type === 'bounce' && player.vy > 0) {
         player.vy = -14;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 8 && particles.length < MAX_PARTICLES; i++) {
           particles.push({
             x: player.x + player.w / 2,
             y: p.y,
@@ -1285,8 +1291,12 @@ function drawWin() {
 }
 
 // --- Main Loop ---
-function loop() {
+let lastFrameTime = 0;
+const FRAME_MIN = 1000 / 65; // cap at ~60fps for consistent physics
+function loop(timestamp) {
   requestAnimationFrame(loop);
+  if (timestamp - lastFrameTime < FRAME_MIN) return;
+  lastFrameTime = timestamp;
 
   if (gameState === 'menu') {
     drawBg();
@@ -1321,7 +1331,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
   loadStage(0);
 });
 
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
