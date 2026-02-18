@@ -21,6 +21,11 @@ const REJECT_WORDS = new Set([
   '❌', 'reject', 'rejected',
 ]);
 
+const REVERT_WORDS = new Set([
+  'revert', 'rollback', 'roll back', 'undo', 'undo it',
+  'revert it', 'roll it back',
+]);
+
 const STATUS_WORDS = new Set([
   '?', 'status', 'state',
   'what are you doing', 'what are you working on',
@@ -55,6 +60,11 @@ function isRejection(text) {
   const t = text.trim().toLowerCase();
   if (REJECT_WORDS.has(t)) return true;
   return ['no', 'nope', 'cancel', 'stop', 'abort', 'never mind', 'nevermind'].some(w => t.startsWith(w));
+}
+
+function isRevertCommand(text) {
+  const t = text.trim().toLowerCase();
+  return REVERT_WORDS.has(t) || t.startsWith('revert') || t.startsWith('rollback') || t.startsWith('undo');
 }
 
 function isStatusQuery(text) {
@@ -130,6 +140,26 @@ function successReport({ filesChanged, commitHash, commitMessage }) {
   return `✅ Done!\nFiles: ${fileList}${commitLine}\nLive at: game-arcade.graciebelle.cc`;
 }
 
+function stagingReady(stagingUrl) {
+  return `🧪 Staged! Test it here:\n${stagingUrl}\n\nLooks good?\n• yes — ship to production\n• no — leave it staged for now\n• revert — undo the changes`;
+}
+
+function shippingToProd() {
+  return '🚀 Shipping to production...';
+}
+
+function prodDeployed() {
+  return '✅ Live at: game-arcade.graciebelle.cc';
+}
+
+function revertingChanges() {
+  return '↩️ Reverting changes...';
+}
+
+function reverted() {
+  return '↩️ Changes reverted. Back to the previous version.';
+}
+
 function partialReport({ steps }) {
   const lines = steps.map(s => `${s.ok ? '✅' : '❌'} ${s.label}${s.error ? ': ' + s.error : ''}`);
   return `⚠️ Partially done:\n${lines.join('\n')}`;
@@ -167,6 +197,8 @@ function statusReport(state) {
       return `🤔 I have a pending plan for:\n"${state.pendingInstruction}"\n\nAnd you sent a new instruction. Abandon the old plan? (yes / no)`;
     case 'executing':
       return '🔨 Currently executing a plan. Almost done!';
+    case 'awaiting_staging_confirm':
+      return `🧪 Waiting for staging sign-off:\n${state.stagingUrl || '(url not available)'}\n\nReply yes to ship to production, no to leave staged, or revert to undo.`;
     default:
       return '🤷 Not sure what I\'m doing tbh. Try sending a new instruction!';
   }
@@ -210,6 +242,7 @@ function executionTimeout() {
 module.exports = {
   isConfirmation,
   isRejection,
+  isRevertCommand,
   isStatusQuery,
   isGreeting,
   isMemoryQuery,
@@ -222,6 +255,11 @@ module.exports = {
   planMessage,
   confirmExecuting,
   successReport,
+  stagingReady,
+  shippingToProd,
+  prodDeployed,
+  revertingChanges,
+  reverted,
   partialReport,
   cancelled,
   planExpired,

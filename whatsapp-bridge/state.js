@@ -31,7 +31,7 @@ function saveToDisk() {
 
 function defaultState() {
   return {
-    status: 'idle',                  // 'idle' | 'awaiting_confirm' | 'awaiting_abandon_confirm' | 'executing'
+    status: 'idle',                  // 'idle' | 'awaiting_confirm' | 'awaiting_abandon_confirm' | 'executing' | 'awaiting_staging_confirm'
     pendingPlan: null,               // plan text waiting for confirmation
     pendingInstruction: null,        // original user instruction
     pendingNewInstruction: null,     // new instruction received while awaiting_confirm
@@ -39,6 +39,7 @@ function defaultState() {
     claudeSessionId: null,           // SDK session ID — now persists across restarts
     lastGreetedDate: null,           // 'YYYY-MM-DD'
     interactionCount: 0,             // incremented on each generatePlan; triggers compaction at threshold
+    stagingUrl: null,                // staging preview URL after execution, before prod deploy
   };
 }
 
@@ -64,6 +65,7 @@ function clearPendingPlan(chatId) {
     pendingInstruction: null,
     pendingNewInstruction: null,
     expiresAt: null,
+    stagingUrl: null,
   });
 }
 

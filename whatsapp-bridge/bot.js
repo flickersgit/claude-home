@@ -235,6 +235,22 @@ async function handleMessage(msg, fromReconnect) {
     return;
   }
 
+  // Awaiting staging sign-off before production deploy
+  if (state.status === 'awaiting_staging_confirm') {
+    if (mochi.isConfirmation(text)) {
+      await doDeployToProd(chatId);
+    } else if (mochi.isRevertCommand(text)) {
+      await doRevertStaging(chatId);
+    } else if (mochi.isRejection(text)) {
+      // Cancel prod deploy but keep staged — back to idle
+      setState(chatId, { status: 'idle', stagingUrl: null });
+      await client.sendMessage(chatId, 'OK, not deploying to production. Changes are staged and committed. 👍');
+    } else {
+      await client.sendMessage(chatId, `🧪 Still waiting on staging sign-off.\n\nTest it: ${state.stagingUrl || '(staging URL unavailable)'}\n\nReply yes to ship to prod, no to skip, or revert to undo.`);
+    }
+    return;
+  }
+
   // Awaiting "abandon old plan?" confirmation
   if (state.status === 'awaiting_abandon_confirm') {
     if (mochi.isConfirmation(text)) {
@@ -378,32 +394,111 @@ async function doExecute(chatId, state) {
   clearTimeout(timeoutHandle);
   if (timedOut) return;
 
-  // Update session ID, clear pending plan
+  // If execution had step failures, report and go idle
+  if (execResult.steps && execResult.steps.length > 0) {
+    setState(chatId, {
+      status: 'idle',
+      pendingPlan: null,
+      pendingInstruction: null,
+      expiresAt: null,
+      claudeSessionId: execResult.sessionId,
+      stagingUrl: null,
+    });
+    await client.sendMessage(chatId, mochi.partialReport({ steps: execResult.steps }));
+    heartbeat.flushQueue(client, OWNER_NUMBER);
+    return;
+  }
+
+  // Staged successfully — wait for prod sign-off
+  if (execResult.success && execResult.stagingUrl) {
+    setState(chatId, {
+      status: 'awaiting_staging_confirm',
+      pendingPlan: null,
+      pendingInstruction: null,
+      expiresAt: null,
+      claudeSessionId: execResult.sessionId,
+      stagingUrl: execResult.stagingUrl,
+    });
+    await client.sendMessage(chatId, mochi.stagingReady(execResult.stagingUrl));
+    heartbeat.flushQueue(client, OWNER_NUMBER);
+    return;
+  }
+
+  // No staging URL captured — fall back to direct success/error report
   setState(chatId, {
     status: 'idle',
     pendingPlan: null,
     pendingInstruction: null,
     expiresAt: null,
     claudeSessionId: execResult.sessionId,
+    stagingUrl: null,
   });
 
-  // Build reply
-  let reply;
-  if (execResult.steps && execResult.steps.length > 0) {
-    reply = mochi.partialReport({ steps: execResult.steps });
-  } else if (execResult.success) {
-    reply = mochi.successReport({
-      filesChanged: execResult.filesChanged,
-      commitHash: execResult.commitHash,
-      commitMessage: execResult.commitMessage,
-    });
-  } else {
-    reply = mochi.errorReport(execResult.raw || 'Unknown error during execution.');
-  }
+  const reply = execResult.success
+    ? mochi.successReport({
+        filesChanged: execResult.filesChanged,
+        commitHash: execResult.commitHash,
+        commitMessage: execResult.commitMessage,
+      })
+    : mochi.errorReport(execResult.raw || 'Unknown error during execution.');
 
   await client.sendMessage(chatId, reply);
 
   // Deliver any queued heartbeat alerts after execution completes
+  heartbeat.flushQueue(client, OWNER_NUMBER);
+}
+
+// ---------------------------------------------------------------------------
+// Deploy staged build to production
+// ---------------------------------------------------------------------------
+async function doDeployToProd(chatId) {
+  setState(chatId, { status: 'executing' });
+  await client.sendMessage(chatId, mochi.shippingToProd());
+
+  try {
+    await new Promise((resolve, reject) => {
+      exec(
+        'wrangler pages deploy . --project-name game-arcade',
+        { cwd: process.env.PROJECT_DIR || path.join(__dirname, '..'), env: process.env },
+        (err, stdout, stderr) => err ? reject(new Error(stderr || err.message)) : resolve(stdout),
+      );
+    });
+    setState(chatId, { status: 'idle', stagingUrl: null });
+    await client.sendMessage(chatId, mochi.prodDeployed());
+  } catch (err) {
+    console.error('[deploy] production deploy failed:', err.message);
+    setState(chatId, { status: 'idle', stagingUrl: null });
+    await client.sendMessage(chatId, mochi.errorReport(`Production deploy failed: ${err.message}`));
+  }
+
+  heartbeat.flushQueue(client, OWNER_NUMBER);
+}
+
+// ---------------------------------------------------------------------------
+// Revert the last commit and push
+// ---------------------------------------------------------------------------
+async function doRevertStaging(chatId) {
+  setState(chatId, { status: 'executing' });
+  await client.sendMessage(chatId, mochi.revertingChanges());
+
+  const projectDir = process.env.PROJECT_DIR || path.join(__dirname, '..');
+
+  try {
+    await new Promise((resolve, reject) => {
+      exec(
+        'git revert HEAD --no-edit && git push',
+        { cwd: projectDir, env: process.env },
+        (err, stdout, stderr) => err ? reject(new Error(stderr || err.message)) : resolve(stdout),
+      );
+    });
+    setState(chatId, { status: 'idle', stagingUrl: null });
+    await client.sendMessage(chatId, mochi.reverted());
+  } catch (err) {
+    console.error('[revert] git revert failed:', err.message);
+    setState(chatId, { status: 'idle', stagingUrl: null });
+    await client.sendMessage(chatId, mochi.errorReport(`Revert failed: ${err.message}`));
+  }
+
   heartbeat.flushQueue(client, OWNER_NUMBER);
 }
 

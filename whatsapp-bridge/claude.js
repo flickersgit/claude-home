@@ -142,6 +142,7 @@ function parseResult(text) {
     filesChanged: [],
     commitHash: null,
     commitMessage: null,
+    stagingUrl: null,
     steps: [],
     raw: text,
   };
@@ -156,6 +157,8 @@ function parseResult(text) {
         result.commitHash = match[1];
         result.commitMessage = match[2].trim();
       }
+    } else if (line.startsWith('STAGING:')) {
+      result.stagingUrl = line.replace('STAGING:', '').trim();
     } else if (line.startsWith('STEP_OK:')) {
       result.steps.push({ ok: true, label: line.replace('STEP_OK:', '').trim() });
     } else if (line.startsWith('STEP_FAIL:')) {
@@ -309,13 +312,16 @@ After making all file changes:
 1. Run: git add <all changed files — list them explicitly, do NOT use git add . or git add -A>
 2. Run: git commit -m "feat: <brief description>"
 3. Run: git push
-4. Run: wrangler pages deploy . --project-name game-arcade
+4. Run: wrangler pages deploy . --project-name game-arcade --branch staging
+   This deploys to a staging preview. Capture the deployment URL from the wrangler output.
+   It will look like: https://staging.game-arcade.pages.dev
 
 Do NOT add or commit: whatsapp-bridge/MEMORY.md, whatsapp-bridge/SOUL.md, whatsapp-bridge/HEARTBEAT.md
 
 Then report results using this exact format:
 FILES: <comma-separated list of changed files>
 COMMIT: <hash> — <commit message>
+STAGING: <staging URL from wrangler output>
 
 If any step fails, report:
 STEP_OK: <succeeded step>
