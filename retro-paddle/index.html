@@ -499,6 +499,14 @@ function update() {
 
   // Input
   let inputX = joyX;
+  // Apply dead zone + easing curve for joystick
+  const deadZone = 0.15;
+  if (Math.abs(inputX) < deadZone) inputX = 0;
+  else {
+    const sign = Math.sign(inputX);
+    const normalized = (Math.abs(inputX) - deadZone) / (1 - deadZone);
+    inputX = sign * normalized * normalized; // quadratic easing
+  }
   if (keys['ArrowLeft'] || keys['a'] || keys['A']) inputX = -1;
   if (keys['ArrowRight'] || keys['d'] || keys['D']) inputX = 1;
 
