@@ -4,94 +4,858 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Game Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  @keyframes flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.6; }
+  }
+  @keyframes scanmove {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 8px var(--glow)); }
+    50% { filter: brightness(1.2) drop-shadow(0 0 20px var(--glow)); }
+  }
+  @keyframes float-up {
+    0% { transform: translateY(60px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes boot-text {
+    0% { width: 0; }
+    100% { width: 100%; }
+  }
+  @keyframes blink-cursor {
+    0%, 100% { border-color: #0f0; }
+    50% { border-color: transparent; }
+  }
+  @keyframes marquee-scroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  @keyframes coin-pulse {
+    0%, 100% { transform: scale(1); text-shadow: 0 0 10px #ff0, 0 0 20px #fa0; }
+    50% { transform: scale(1.05); text-shadow: 0 0 20px #ff0, 0 0 40px #fa0, 0 0 60px #f80; }
+  }
+  @keyframes grid-scroll {
+    0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+    100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+  }
+  @keyframes star-twinkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  @keyframes cabinet-hum {
+    0%, 100% { box-shadow: var(--cabinet-shadow), inset 0 0 60px rgba(0,0,0,0.8); }
+    50% { box-shadow: var(--cabinet-shadow-bright), inset 0 0 50px rgba(0,0,0,0.75); }
+  }
+  @keyframes screen-on {
+    0% { transform: scaleY(0.005) scaleX(0); opacity: 0.5; }
+    30% { transform: scaleY(0.005) scaleX(1); opacity: 0.8; }
+    50% { transform: scaleY(1) scaleX(1); opacity: 1; }
+    100% { transform: scaleY(1) scaleX(1); opacity: 1; }
+  }
+
+  :root {
+    --bg-deep: #05050f;
+    --bg-floor: #0a0a18;
+    --neon-pink: #ff2266;
+    --neon-cyan: #00ffee;
+    --neon-yellow: #ffe033;
+    --arcade-purple: #1a0a2e;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
   body {
-    background: #0a0a1a;
+    background: var(--bg-deep);
     color: #fff;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Silkscreen', 'Press Start 2P', monospace;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 60px 20px;
+    overflow-x: hidden;
+    cursor: crosshair;
   }
-  h1 {
-    font-size: 48px;
-    letter-spacing: 6px;
-    margin-bottom: 10px;
-    text-shadow: 0 0 30px #f06, 0 0 60px #f06;
+
+  /* ── Starfield background ── */
+  .starfield {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    overflow: hidden;
   }
-  p.sub { color: #888; margin-bottom: 50px; font-size: 16px; }
-  .games {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 30px;
-    max-width: 900px;
-    width: 100%;
+  .star {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: #fff;
+    border-radius: 50%;
+    animation: star-twinkle var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+    opacity: 0.4;
   }
-  .card {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 1px solid #333;
-    border-radius: 16px;
-    padding: 30px;
-    text-decoration: none;
+
+  /* ── Perspective grid floor ── */
+  .grid-floor {
+    position: fixed; bottom: -60%; left: -20%; right: -20%;
+    height: 80vh;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,255,238,0.04) 0px, transparent 1px, transparent 50px),
+      repeating-linear-gradient(0deg, rgba(0,255,238,0.04) 0px, transparent 1px, transparent 50px);
+    transform: perspective(500px) rotateX(60deg);
+    animation: grid-scroll 4s linear infinite;
+    z-index: 0; pointer-events: none;
+    mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 70%);
+    -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 70%);
+  }
+
+  /* ── CRT scanlines overlay ── */
+  .scanlines {
+    position: fixed; inset: 0; z-index: 999; pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+  }
+  .scanlines::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(transparent 50%, rgba(0,0,0,0.08) 50%);
+    background-size: 100% 4px;
+    animation: scanmove 8s linear infinite;
+    opacity: 0.3;
+  }
+
+  /* ── Ambient light pools ── */
+  .ambient {
+    position: fixed; z-index: 0; pointer-events: none;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+  }
+  .ambient-1 { width: 600px; height: 600px; background: var(--neon-pink); top: -10%; left: -5%; }
+  .ambient-2 { width: 500px; height: 500px; background: var(--neon-cyan); bottom: -10%; right: -5%; }
+  .ambient-3 { width: 400px; height: 400px; background: #6622ff; top: 40%; left: 50%; transform: translateX(-50%); }
+
+  /* ── Main content ── */
+  .arcade-wrapper {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 80px;
+    min-height: 100vh;
+  }
+
+  /* ── Top marquee bar ── */
+  .marquee-bar {
+    width: 100%; max-width: 960px;
+    border: 1px solid rgba(255,34,102,0.3);
+    border-bottom: none;
+    background: linear-gradient(180deg, rgba(255,34,102,0.08), transparent);
+    padding: 6px 0;
+    overflow: hidden;
+    border-radius: 8px 8px 0 0;
+  }
+  .marquee-text {
+    white-space: nowrap;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--neon-yellow);
+    animation: marquee-scroll 20s linear infinite;
+    text-shadow: 0 0 8px rgba(255,224,51,0.5);
+    letter-spacing: 2px;
+  }
+
+  /* ── Header ── */
+  .header {
+    width: 100%; max-width: 960px;
+    text-align: center;
+    padding: 50px 20px 40px;
+    background: linear-gradient(180deg, rgba(26,10,46,0.6), transparent);
+    border-left: 1px solid rgba(255,34,102,0.15);
+    border-right: 1px solid rgba(255,34,102,0.15);
+    position: relative;
+  }
+
+  .title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(28px, 6vw, 56px);
+    letter-spacing: 8px;
     color: #fff;
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: pointer;
+    text-shadow:
+      0 0 10px var(--neon-pink),
+      0 0 30px var(--neon-pink),
+      0 0 60px var(--neon-pink),
+      0 0 100px rgba(255,34,102,0.4);
+    animation: flicker 4s infinite;
+    margin-bottom: 16px;
+    line-height: 1.3;
+  }
+  .title span {
     display: block;
+    font-size: clamp(14px, 3vw, 24px);
+    color: var(--neon-cyan);
+    text-shadow:
+      0 0 10px var(--neon-cyan),
+      0 0 30px rgba(0,255,238,0.5);
+    letter-spacing: 12px;
+    margin-top: 8px;
+    animation: none;
+    opacity: 0.9;
   }
-  .card:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 10px 40px rgba(255,50,100,0.2);
-    border-color: #f06;
+
+  .insert-coin {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(10px, 2vw, 14px);
+    color: var(--neon-yellow);
+    letter-spacing: 4px;
+    animation: coin-pulse 1.5s ease-in-out infinite;
+    margin-top: 8px;
   }
-  .card h2 { font-size: 28px; margin-bottom: 8px; }
-  .card .tag {
+
+  /* ── Boot sequence ── */
+  .boot-line {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #0f0;
+    text-align: left;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px 0 0;
+    opacity: 0;
+    animation: float-up 0.5s forwards;
+    text-shadow: 0 0 4px rgba(0,255,0,0.5);
+  }
+  .boot-line:nth-child(1) { animation-delay: 0.2s; }
+  .boot-line:nth-child(2) { animation-delay: 0.6s; }
+  .boot-line:nth-child(3) { animation-delay: 1.0s; }
+
+  .boot-area {
+    padding: 12px 20px 20px;
+    display: flex; flex-direction: column; gap: 4px;
+    max-width: 960px; width: 100%;
+    border-left: 1px solid rgba(0,255,0,0.08);
+    border-right: 1px solid rgba(0,255,0,0.08);
+    background: linear-gradient(180deg, transparent, rgba(0,255,0,0.01));
+  }
+
+  /* ── Game cabinet cards ── */
+  .cabinets {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    max-width: 960px; width: 100%;
+    padding: 0 0 40px;
+  }
+
+  @media (max-width: 700px) {
+    .cabinets { grid-template-columns: 1fr; max-width: 420px; }
+  }
+
+  .cabinet {
+    --glow: #ff2266;
+    --accent: #ff2266;
+    --cabinet-shadow: 0 0 30px rgba(255,34,102,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    --cabinet-shadow-bright: 0 0 50px rgba(255,34,102,0.25), 0 8px 32px rgba(0,0,0,0.6);
+
+    position: relative;
+    background: linear-gradient(170deg, #12101e 0%, #0c0a18 50%, #08060f 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none; color: #fff;
+    display: flex; flex-direction: column;
+    animation: cabinet-hum 3s ease-in-out infinite, float-up 0.8s both;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s;
+  }
+  .cabinet:nth-child(1) { animation-delay: 0.3s, 0.3s; }
+  .cabinet:nth-child(2) { animation-delay: 0.8s, 0.5s; --glow: #00ff88; --accent: #00ff88;
+    --cabinet-shadow: 0 0 30px rgba(0,255,136,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    --cabinet-shadow-bright: 0 0 50px rgba(0,255,136,0.25), 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .cabinet:nth-child(3) { animation-delay: 1.3s, 0.7s; --glow: #ff6644; --accent: #ff6644;
+    --cabinet-shadow: 0 0 30px rgba(255,102,68,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    --cabinet-shadow-bright: 0 0 50px rgba(255,102,68,0.25), 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .cabinet:nth-child(4) { animation-delay: 1.8s, 0.9s; --glow: #00ccff; --accent: #00ccff;
+    --cabinet-shadow: 0 0 30px rgba(0,204,255,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    --cabinet-shadow-bright: 0 0 50px rgba(0,204,255,0.25), 0 8px 32px rgba(0,0,0,0.6);
+  }
+
+  .cabinet:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--accent);
+    z-index: 10;
+  }
+  .cabinet:hover .screen-content {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+  .cabinet:hover .play-prompt {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .cabinet:hover .cabinet-bezel {
+    border-color: var(--accent);
+  }
+
+  /* Screen area */
+  .cabinet-screen {
+    position: relative;
+    padding: 16px 16px 0;
+  }
+  .cabinet-bezel {
+    border: 2px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 3px;
+    background: #000;
+    transition: border-color 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .screen-content {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: var(--screen-bg, #0a0a0a);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* CRT curvature on screen */
+  .screen-content::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 3px;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.3);
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px, transparent 1px,
+      rgba(0,0,0,0.12) 1px, rgba(0,0,0,0.12) 2px
+    );
+    pointer-events: none;
+    z-index: 2;
+  }
+  /* Power LED */
+  .cabinet-bezel::before {
+    content: '';
+    position: absolute;
+    bottom: -10px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--glow), 0 0 12px var(--glow);
+    z-index: 3;
+  }
+
+  /* Pixel art scenes inside screens */
+  .pixel-scene {
+    width: 100%; height: 100%;
+    position: relative;
+    image-rendering: pixelated;
+  }
+
+  /* ── Basketball scene ── */
+  .scene-basket {
+    --screen-bg: #1a0a00;
+    background: linear-gradient(180deg, #2a1040 0%, #2a1040 30%, #c06020 30%, #c06020 100%);
+  }
+  .scene-basket .court-line {
+    position: absolute; bottom: 0; left: 10%; right: 10%; top: 30%;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+  }
+  .scene-basket .three-arc {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 60%; height: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-bottom: none;
+    border-radius: 100% 100% 0 0;
+  }
+  .scene-basket .hoop {
+    position: absolute; top: 32%; left: 50%; transform: translateX(-50%);
+    width: 28px; height: 4px;
+    background: #ff4400;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(255,68,0,0.6);
+  }
+  .scene-basket .hoop::after {
+    content: '';
+    position: absolute; top: 4px; left: 4px; right: 4px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.5);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+  }
+  .scene-basket .backboard {
+    position: absolute; top: 28%; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 24px;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.05);
+  }
+  .scene-basket .player-mj {
+    position: absolute; bottom: 25%; left: 22%;
+    width: 16px; height: 24px;
+    background: #cc0000;
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 -8px 0 0 #e8a060, 0 24px 0 0 #cc0000;
+  }
+  .scene-basket .player-mj::before {
+    content: '23';
+    position: absolute; top: 4px; left: 1px;
+    font-size: 6px; color: #fff; font-family: 'Press Start 2P', monospace;
+  }
+  .scene-basket .player-curry {
+    position: absolute; bottom: 45%; right: 25%;
+    width: 16px; height: 24px;
+    background: #1144cc;
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 -8px 0 0 #d0a070, 0 24px 0 0 #1144cc;
+  }
+  .scene-basket .ball {
+    position: absolute; top: 42%; left: 38%;
+    width: 10px; height: 10px;
+    background: #ff8800;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(255,136,0,0.8);
+    animation: star-twinkle 0.8s ease-in-out infinite;
+  }
+  .scene-basket .crowd-dot {
+    position: absolute; top: 8%; width: 4px; height: 4px; border-radius: 50%;
+  }
+
+  /* ── Space shooter scene ── */
+  .scene-shooter {
+    --screen-bg: #000;
+    background: radial-gradient(ellipse at 50% 80%, #0a1020, #000);
+  }
+  .scene-shooter .ship {
+    position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 16px solid #00ccff;
+    filter: drop-shadow(0 0 6px #00ccff);
+  }
+  .scene-shooter .ship::after {
+    content: '';
+    position: absolute; top: 16px; left: -4px;
+    width: 8px; height: 12px;
+    background: linear-gradient(to bottom, #0088ff, transparent);
+    border-radius: 0 0 3px 3px;
+  }
+  .scene-shooter .enemy {
+    position: absolute;
+    width: 14px; height: 10px;
+    background: #00ff44;
+    clip-path: polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%);
+    filter: drop-shadow(0 0 4px #00ff44);
+  }
+  .scene-shooter .laser {
+    position: absolute;
+    width: 2px; height: 12px;
+    background: #ffff00;
+    box-shadow: 0 0 4px #ffff00;
+  }
+  .scene-shooter .s-star {
+    position: absolute;
+    width: 1px; height: 1px;
+    background: #fff;
+    border-radius: 50%;
+    opacity: 0.6;
+  }
+
+  /* ── Obby scene ── */
+  .scene-obby {
+    --screen-bg: #0e0a1a;
+    background: linear-gradient(180deg, #0e0a1a, #1a1030);
+  }
+  .scene-obby .lava {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 12%;
+    background: linear-gradient(180deg, #ff4400, #ff6600);
+    box-shadow: 0 -4px 16px rgba(255,68,0,0.6);
+  }
+  .scene-obby .lava::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: #ffcc00;
+    box-shadow: 0 0 8px #ff8800;
+  }
+  .scene-obby .platform {
+    position: absolute;
+    height: 10px;
+    background: #555;
+    border-radius: 2px;
+    border-top: 2px solid #777;
+  }
+  .scene-obby .plat-1 { bottom: 12%; left: 5%; width: 30%; }
+  .scene-obby .plat-2 { bottom: 28%; left: 35%; width: 25%; }
+  .scene-obby .plat-3 { bottom: 44%; right: 8%; width: 22%; }
+  .scene-obby .plat-4 { bottom: 58%; left: 15%; width: 18%; }
+  .scene-obby .ob-player {
+    position: absolute; bottom: 14%; left: 15%;
+    width: 10px; height: 14px;
+    background: #4488ff;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(68,136,255,0.6);
+  }
+  .scene-obby .ob-player::before {
+    content: '';
+    position: absolute; top: -4px; left: 2px;
+    width: 6px; height: 6px;
+    background: #66aaff;
+    border-radius: 1px;
+  }
+  .scene-obby .mountain {
+    position: absolute; bottom: 12%;
+    width: 0; height: 0;
+    border-left: 30px solid transparent;
+    border-right: 30px solid transparent;
+    border-bottom: 50px solid #1a1030;
+    opacity: 0.5;
+  }
+
+  /* ── Void Runner scene ── */
+  .scene-racing {
+    --screen-bg: #020408;
+    background: radial-gradient(ellipse at 50% 30%, #0a1428, #020408);
+  }
+  .scene-racing .track-border {
+    position: absolute; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom,
+      transparent 0%, rgba(0,136,255,0.5) 10%, rgba(0,136,255,0.3) 50%,
+      rgba(0,136,255,0.5) 90%, transparent 100%
+    );
+    box-shadow: 0 0 10px rgba(0,136,255,0.3);
+  }
+  .scene-racing .track-left { left: 18%; }
+  .scene-racing .track-right { right: 18%; }
+  .scene-racing .r-ship {
+    position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 22px solid #0088ff;
+    filter: drop-shadow(0 0 8px #0088ff);
+  }
+  .scene-racing .r-ship::after {
+    content: '';
+    position: absolute; top: 22px; left: -5px;
+    width: 10px; height: 18px;
+    background: linear-gradient(to bottom, #0066ff, #ff6600, transparent);
+    border-radius: 0 0 4px 4px;
+  }
+  .scene-racing .asteroid {
+    position: absolute;
+    background: #665544;
+    border-radius: 40%;
+    transform: rotate(30deg);
+  }
+  .scene-racing .ast-1 { top: 15%; right: 25%; width: 22px; height: 18px; }
+  .scene-racing .ast-2 { top: 45%; left: 22%; width: 14px; height: 12px; }
+  .scene-racing .ast-3 { top: 65%; right: 30%; width: 10px; height: 9px; transform: rotate(-20deg); }
+  .scene-racing .energy-orb {
+    position: absolute; top: 35%; left: 38%;
+    width: 8px; height: 8px;
+    background: #00ff88;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00ff88, 0 0 16px rgba(0,255,136,0.4);
+    animation: star-twinkle 1s ease-in-out infinite;
+  }
+  .scene-racing .warp-line {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(to bottom, rgba(0,136,255,0.4), transparent);
+  }
+
+  /* ── Card info area ── */
+  .cabinet-info {
+    padding: 18px 18px 14px;
+    flex: 1;
+    display: flex; flex-direction: column;
+    gap: 8px;
+    position: relative;
+  }
+  .cabinet-info .game-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(12px, 2.5vw, 16px);
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--glow);
+    letter-spacing: 2px;
+    line-height: 1.4;
+  }
+  .cabinet-info .game-tag {
     display: inline-block;
-    background: rgba(255,255,255,0.1);
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
     padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    color: #aaa;
-    margin-bottom: 12px;
+    border-radius: 3px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    width: fit-content;
   }
-  .card p { color: #999; font-size: 14px; line-height: 1.6; }
-  .card .emoji { font-size: 48px; margin-bottom: 12px; }
-  .basket h2 { color: #f80; }
-  .shooter h2 { color: #0f0; }
-  .obby h2 { color: #4af; }
-  .racing h2 { color: #33ff33; }
+  .cabinet-info .game-desc {
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    line-height: 1.7;
+    letter-spacing: 0.5px;
+  }
+
+  /* Play prompt on hover */
+  .play-prompt {
+    position: absolute;
+    bottom: 12px; right: 16px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: all 0.3s;
+    text-shadow: 0 0 6px var(--glow);
+  }
+  .play-prompt::after {
+    content: ' >';
+    animation: blink-cursor 0.8s infinite;
+  }
+
+  /* ── Bottom bar ── */
+  .bottom-bar {
+    max-width: 960px; width: 100%;
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: rgba(255,255,255,0.15);
+    letter-spacing: 2px;
+  }
+  .bottom-bar .credits {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 6px rgba(255,224,51,0.3);
+  }
+
+  /* ── Screen-on animation for individual screens ── */
+  .cabinet:nth-child(1) .screen-content { animation: screen-on 0.6s 0.5s both; }
+  .cabinet:nth-child(2) .screen-content { animation: screen-on 0.6s 0.7s both; }
+  .cabinet:nth-child(3) .screen-content { animation: screen-on 0.6s 0.9s both; }
+  .cabinet:nth-child(4) .screen-content { animation: screen-on 0.6s 1.1s both; }
+
+  /* ── Responsive tweaks ── */
+  @media (max-width: 500px) {
+    .arcade-wrapper { padding: 20px 12px 60px; }
+    .cabinet-screen { padding: 12px 12px 0; }
+    .cabinet-info { padding: 14px 14px 12px; }
+    .header { padding: 30px 16px 28px; }
+    .title { letter-spacing: 4px; }
+  }
 </style>
 </head>
 <body>
-  <h1>GAME ARCADE</h1>
-  <p class="sub">Pick a game and play!</p>
-  <div class="games">
-    <a href="retro-basket/" class="card basket">
-      <div class="emoji">🏀</div>
-      <h2>RETRO SHOOTOUT</h2>
-      <span class="tag">Basketball</span>
-      <p>MJ vs Curry shooting competition! Pick your angle & power, dodge defenders, drones, mascots & birds. ON FIRE mode, playoff music, 3 rounds.</p>
-    </a>
-    <a href="retro-shooter/" class="card shooter">
-      <div class="emoji">🚀</div>
-      <h2>GALACTIC DEFENDER</h2>
-      <span class="tag">Space Shooter</span>
-      <p>Retro space shooter with waves of enemies, power-ups, bombs, boss fights every 5 waves, and 8-bit sound effects.</p>
-    </a>
-    <a href="obby/" class="card obby">
-      <div class="emoji">🏃</div>
-      <h2>OBBY</h2>
-      <span class="tag">Platformer</span>
-      <p>20-stage obstacle course with wall jumps, ice, bounce pads, conveyor belts, crumbling platforms, and more. Stages 11-20 are HARD MODE.</p>
-    </a>
-    <a href="retro-racing/" class="card racing">
-      <div class="emoji">🏎️</div>
-      <h2>RETRO RACING</h2>
-      <span class="tag">Racing</span>
-      <p>Retro arcade racing with traffic dodging, fuel pickups, night mode, combo system, and increasing difficulty. How far can you go?</p>
-    </a>
+
+<!-- Background layers -->
+<div class="starfield" id="starfield"></div>
+<div class="grid-floor"></div>
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+<div class="ambient ambient-3"></div>
+<div class="scanlines"></div>
+
+<div class="arcade-wrapper">
+
+  <!-- Marquee ticker -->
+  <div class="marquee-bar">
+    <div class="marquee-text">
+      ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ 4 GAMES READY TO PLAY ★ HIGH SCORES WELCOME ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★
+    </div>
   </div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1 class="title">
+      GAME<br>ARCADE
+      <span>SELECT YOUR GAME</span>
+    </h1>
+    <div class="insert-coin">INSERT COIN</div>
+  </div>
+
+  <!-- Boot text -->
+  <div class="boot-area">
+    <div class="boot-line">SYSTEM BOOT... OK</div>
+    <div class="boot-line">LOADING 4 CABINETS... READY</div>
+    <div class="boot-line">> SELECT GAME _</div>
+  </div>
+
+  <!-- Game cabinets -->
+  <div class="cabinets">
+
+    <!-- 1. Retro Shootout -->
+    <a href="retro-basket/" class="cabinet">
+      <div class="cabinet-screen">
+        <div class="cabinet-bezel">
+          <div class="screen-content">
+            <div class="pixel-scene scene-basket">
+              <div class="court-line"></div>
+              <div class="three-arc"></div>
+              <div class="backboard"></div>
+              <div class="hoop"></div>
+              <div class="player-mj"></div>
+              <div class="player-curry"></div>
+              <div class="ball"></div>
+              <div class="crowd-dot" style="left:10%;background:#f44"></div>
+              <div class="crowd-dot" style="left:20%;background:#ff0"></div>
+              <div class="crowd-dot" style="left:30%;background:#4f4"></div>
+              <div class="crowd-dot" style="left:45%;background:#f8f"></div>
+              <div class="crowd-dot" style="left:55%;background:#4ff"></div>
+              <div class="crowd-dot" style="left:68%;background:#ff4"></div>
+              <div class="crowd-dot" style="left:78%;background:#f44"></div>
+              <div class="crowd-dot" style="left:88%;background:#84f"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">RETRO SHOOTOUT</div>
+        <div class="game-tag">Basketball</div>
+        <div class="game-desc">MJ vs Curry shooting competition. Dodge defenders, drones & mascots. ON FIRE mode, playoff music, 3 rounds.</div>
+        <div class="play-prompt">PLAY</div>
+      </div>
+    </a>
+
+    <!-- 2. Galactic Defender -->
+    <a href="retro-shooter/" class="cabinet">
+      <div class="cabinet-screen">
+        <div class="cabinet-bezel">
+          <div class="screen-content">
+            <div class="pixel-scene scene-shooter">
+              <div class="s-star" style="top:8%;left:12%"></div>
+              <div class="s-star" style="top:20%;left:70%"></div>
+              <div class="s-star" style="top:35%;left:45%"></div>
+              <div class="s-star" style="top:50%;left:85%"></div>
+              <div class="s-star" style="top:65%;left:25%"></div>
+              <div class="s-star" style="top:78%;left:60%"></div>
+              <div class="enemy" style="top:10%;left:15%"></div>
+              <div class="enemy" style="top:10%;left:45%"></div>
+              <div class="enemy" style="top:10%;right:15%"></div>
+              <div class="enemy" style="top:22%;left:30%"></div>
+              <div class="enemy" style="top:22%;right:25%"></div>
+              <div class="laser" style="bottom:30%;left:calc(50% - 1px)"></div>
+              <div class="laser" style="bottom:42%;left:calc(50% - 1px)"></div>
+              <div class="ship"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">GALACTIC DEFENDER</div>
+        <div class="game-tag">Space Shooter</div>
+        <div class="game-desc">Waves of enemies, power-ups, bombs, boss fights every 5 waves, and 8-bit sound effects.</div>
+        <div class="play-prompt">PLAY</div>
+      </div>
+    </a>
+
+    <!-- 3. Obby -->
+    <a href="obby/" class="cabinet">
+      <div class="cabinet-screen">
+        <div class="cabinet-bezel">
+          <div class="screen-content">
+            <div class="pixel-scene scene-obby">
+              <div class="mountain" style="left:5%"></div>
+              <div class="mountain" style="left:30%"></div>
+              <div class="mountain" style="right:10%"></div>
+              <div class="lava"></div>
+              <div class="platform plat-1"></div>
+              <div class="platform plat-2"></div>
+              <div class="platform plat-3"></div>
+              <div class="platform plat-4"></div>
+              <div class="ob-player"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">OBBY</div>
+        <div class="game-tag">Platformer</div>
+        <div class="game-desc">20-stage obstacle course. Wall jumps, ice, bounce pads, conveyor belts, crumbling platforms. Stages 11-20 are HARD MODE.</div>
+        <div class="play-prompt">PLAY</div>
+      </div>
+    </a>
+
+    <!-- 4. Void Runner -->
+    <a href="retro-racing/" class="cabinet">
+      <div class="cabinet-screen">
+        <div class="cabinet-bezel">
+          <div class="screen-content">
+            <div class="pixel-scene scene-racing">
+              <div class="warp-line" style="left:25%;top:10%;height:30%"></div>
+              <div class="warp-line" style="left:40%;top:5%;height:25%"></div>
+              <div class="warp-line" style="right:30%;top:20%;height:20%"></div>
+              <div class="warp-line" style="left:55%;top:0%;height:35%"></div>
+              <div class="track-border track-left"></div>
+              <div class="track-border track-right"></div>
+              <div class="asteroid ast-1"></div>
+              <div class="asteroid ast-2"></div>
+              <div class="asteroid ast-3"></div>
+              <div class="energy-orb"></div>
+              <div class="r-ship"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">VOID RUNNER</div>
+        <div class="game-tag">Space Racing</div>
+        <div class="game-desc">Race through the void! Dodge asteroids & rival ships, collect energy orbs, boost through warp speed.</div>
+        <div class="play-prompt">PLAY</div>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <span>4 GAMES LOADED</span>
+    <span class="credits">CREDITS: 99</span>
+  </div>
+
+</div>
+
+<script>
+// Generate starfield
+const sf = document.getElementById('starfield');
+for (let i = 0; i < 80; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.cssText = `
+    left:${Math.random()*100}%;
+    top:${Math.random()*100}%;
+    width:${1+Math.random()*2}px;
+    height:${1+Math.random()*2}px;
+    --dur:${2+Math.random()*4}s;
+    --delay:${Math.random()*3}s;
+    opacity:${0.2+Math.random()*0.5};
+  `;
+  sf.appendChild(s);
+}
+
+// Subtle parallax on mouse move
+document.addEventListener('mousemove', (e) => {
+  const x = (e.clientX / window.innerWidth - 0.5) * 10;
+  const y = (e.clientY / window.innerHeight - 0.5) * 10;
+  sf.style.transform = `translate(${x}px, ${y}px)`;
+});
+</script>
+
 </body>
 </html>

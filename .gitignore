@@ -13,3 +13,11 @@
 # Private keys
 setup/textastic_ed25519
 setup/textastic_rsa
+
+# Node
+node_modules/
+
+# Generated files
+*.mp4
+concat_list.txt
+screenshots/
