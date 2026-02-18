@@ -19,10 +19,6 @@ if (!OWNER_NUMBER) {
   console.error('[boot] OWNER_NUMBER is not set in .env — Mochi cannot start.');
   process.exit(1);
 }
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('[boot] ANTHROPIC_API_KEY is not set in .env — Mochi cannot start.');
-  process.exit(1);
-}
 
 console.log(`[boot] Starting Mochi... Owner: ${OWNER_NUMBER}`);
 
