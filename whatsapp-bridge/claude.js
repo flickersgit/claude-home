@@ -9,7 +9,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const CODEX_PATH = process.env.CODEX_PATH || '/usr/local/bin/codex';
-const CODEX_MODEL = process.env.CODEX_MODEL || null; // null = codex default
+const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.3-codex';
 
 const PROJECT_DIR = process.env.PROJECT_DIR || path.join(__dirname, '..');
 const CLAUDE_PATH = process.env.CLAUDE_PATH || '/Users/statpods/.local/bin/claude';
