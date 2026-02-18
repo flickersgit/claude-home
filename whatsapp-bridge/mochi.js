@@ -101,10 +101,11 @@ function shouldGreet(state) {
 // Message templates
 // ---------------------------------------------------------------------------
 
-function greeting() {
+function greeting(name) {
   const hour = new Date().getHours();
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  return `Good ${timeOfDay}! ☕ I'm Mochi — your game arcade assistant. What are we building today?`;
+  const hi = name ? `Good ${timeOfDay}, ${name}!` : `Good ${timeOfDay}!`;
+  return `${hi} ☕ I'm Mochi — your game arcade assistant. What are we building today?`;
 }
 
 const CASUAL_GREETINGS = [
@@ -116,8 +117,18 @@ const CASUAL_GREETINGS = [
   "Hiya! Ready when you are — what's on the agenda?",
 ];
 
-function casualGreeting() {
-  return CASUAL_GREETINGS[Math.floor(Math.random() * CASUAL_GREETINGS.length)];
+const CASUAL_GREETINGS_NAMED = [
+  (n) => `Hey ${n}! 👋 Ready to build something fun?`,
+  (n) => `Yo ${n}! 🎮 What are we making today?`,
+  (n) => `${n}! Mochi's here and caffeinated ☕ What's the mission?`,
+  (n) => `Oh hi ${n}! 👾 Got a game idea brewing?`,
+  (n) => `Sup ${n}! 🕹️ Tell me what to build!`,
+  (n) => `Hey ${n}! Ready when you are — what's on the agenda?`,
+];
+
+function casualGreeting(name) {
+  const idx = Math.floor(Math.random() * CASUAL_GREETINGS.length);
+  return name ? CASUAL_GREETINGS_NAMED[idx](name) : CASUAL_GREETINGS[idx];
 }
 
 function thinking() {

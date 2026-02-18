@@ -33,6 +33,20 @@ const ALLOWED_NUMBERS = new Set([
   ...((process.env.ALLOWED_NUMBERS || '').split(',').map(n => n.trim()).filter(Boolean)),
 ]);
 
+// Contact names — CONTACT_NAMES="num:Name,num:Name"
+const CONTACT_NAMES = new Map();
+for (const entry of (process.env.CONTACT_NAMES || '').split(',')) {
+  const colonIdx = entry.indexOf(':');
+  if (colonIdx === -1) continue;
+  const num = entry.slice(0, colonIdx).trim();
+  const name = entry.slice(colonIdx + 1).trim();
+  if (num && name) CONTACT_NAMES.set(num, name);
+}
+
+function getName(chatId) {
+  return CONTACT_NAMES.get(chatId) || null;
+}
+
 console.log(`[boot] Starting Mochi... Owner: ${OWNER_NUMBER}, allowed: ${ALLOWED_NUMBERS.size} number(s)`);
 
 // ---------------------------------------------------------------------------
@@ -225,7 +239,7 @@ async function handleMessage(msg, fromReconnect) {
 
   // Casual greeting — respond with a fun reply, no planning
   if (mochi.isGreeting(text)) {
-    await client.sendMessage(chatId, mochi.casualGreeting());
+    await client.sendMessage(chatId, mochi.casualGreeting(getName(chatId)));
     return;
   }
 
@@ -318,7 +332,7 @@ async function processInstruction(chatId, instruction) {
 
   // Daily greeting
   if (mochi.shouldGreet(state)) {
-    await client.sendMessage(chatId, mochi.greeting());
+    await client.sendMessage(chatId, mochi.greeting(getName(chatId)));
     setState(chatId, { lastGreetedDate: mochi.todayString() });
   }
 

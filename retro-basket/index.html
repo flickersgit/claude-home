@@ -473,6 +473,9 @@ let consecutiveHits=[0,0];
 let onFire=[false,false];
 let fireTimer=[0,0];
 
+// Teammate assist
+let teammate={x:0,y:0,active:false,assisted:false,readyGlow:0,waveAnim:0};
+
 // Positions
 const SPOTS=[
   {x:55,y:490,label:'CORNER 3',pts:3,diff:0.85},
@@ -1007,6 +1010,12 @@ function startShot(){
   // Spawn new enemies each shot
   enemySpawnTimer=0;
   spawnEnemies();
+  // Place teammate between shooter and basket, offset to one side
+  const spotIdx=spotOrder[Math.min(currentSpot,spotOrder.length-1)];
+  const spot=SPOTS[spotIdx]||SPOTS[0];
+  const tx=spot.x<HOOP.x?spot.x+80:spot.x-80;
+  const ty=Math.max(280,Math.min(spot.y-60,430));
+  teammate={x:Math.max(60,Math.min(tx,W-60)),y:ty,active:true,assisted:false,readyGlow:0,waveAnim:0};
 }
 
 function launchBall(){
@@ -1286,6 +1295,91 @@ function drawPlayer(p,x,y,shooting=false,frame=0){
   }
 
   X.restore();
+  X.restore();
+}
+
+function drawTeammate(x,y,readyGlow,waveAnim){
+  X.save();
+  X.translate(x,y);
+
+  // Shadow
+  X.fillStyle='rgba(0,0,0,0.25)';
+  X.beginPath();
+  X.ellipse(0,24,12,3,0,0,Math.PI*2);
+  X.fill();
+
+  // Glow ring when ball is near
+  if(readyGlow>0.05){
+    X.globalAlpha=readyGlow*0.7;
+    X.strokeStyle='#0ff';
+    X.lineWidth=3;
+    X.beginPath();
+    X.arc(0,-5,22,0,Math.PI*2);
+    X.stroke();
+    X.globalAlpha=1;
+  }
+
+  // Waving arm offset
+  const wave=Math.sin(waveAnim)*8;
+
+  // Legs
+  X.fillStyle='#444';
+  X.fillRect(-8,18,6,14);
+  X.fillRect(2,18,6,14);
+  // Shoes
+  X.fillStyle='#222';
+  X.fillRect(-10,31,8,3);
+  X.fillRect(2,31,8,3);
+
+  // Body
+  X.fillStyle='#0aa';
+  X.fillRect(-8,2,16,16);
+  // Jersey trim
+  X.fillStyle='#088';
+  X.fillRect(-8,2,16,2);
+
+  // Number "T"
+  X.fillStyle='#fff';
+  X.font='bold 9px Courier New';
+  X.textAlign='center';
+  X.fillText('T',0,12);
+
+  // Waving arm
+  X.fillStyle='#a07040';
+  X.save();
+  X.translate(8,4);
+  X.rotate((-60+wave*2)*Math.PI/180);
+  X.fillRect(-2,-12,4,12);
+  X.restore();
+  // Other arm
+  X.fillRect(-10,4,4,10);
+
+  // Head
+  X.fillStyle='#a07040';
+  X.fillRect(-6,-14,12,12);
+  // Hair
+  X.fillStyle='#3a2000';
+  X.fillRect(-6,-14,12,4);
+  // Eyes
+  X.fillStyle='#fff';
+  X.fillRect(-4,-9,3,2);
+  X.fillRect(1,-9,3,2);
+  X.fillStyle='#000';
+  X.fillRect(-3,-9,2,2);
+  X.fillRect(2,-9,2,2);
+  // Smile
+  X.fillStyle='#000';
+  X.fillRect(-2,-5,4,1);
+
+  // "ASSIST" label above head when ball close
+  if(readyGlow>0.3){
+    X.globalAlpha=readyGlow;
+    X.fillStyle='#0ff';
+    X.font='bold 8px Courier New';
+    X.fillText('READY!',0,-22);
+    X.globalAlpha=1;
+  }
+
   X.restore();
 }
 
@@ -1679,6 +1773,28 @@ function update(dt){
     ball.y+=ball.vy;
     ball.vy+=ball.gravity;
 
+    // Teammate assist: redirect ball toward basket when ball is close
+    if(teammate.active&&!teammate.assisted&&!ball.scored){
+      const tdist=Math.hypot(ball.x-teammate.x,ball.y-teammate.y);
+      teammate.readyGlow=Math.max(0,1-tdist/120);
+      teammate.waveAnim+=0.1;
+      if(tdist<40){
+        // Assist! redirect ball in an arc toward the basket center
+        teammate.assisted=true;
+        teammate.active=false;
+        const dx=HOOP.x-ball.x;
+        const dy=HOOP.y-ball.y;
+        const dist=Math.hypot(dx,dy);
+        const speed=Math.max(4,Math.hypot(ball.vx,ball.vy));
+        ball.vx=(dx/dist)*speed*0.8;
+        ball.vy=-(Math.abs(dy/dist)*speed*1.1+1.5);
+        ball.rimHits=0; // fresh trajectory — don't penalize
+        snd('bounce');
+        spawnParticles(teammate.x,teammate.y,'#0ff',14,4);
+        addFlashText(teammate.x,teammate.y-30,'ASSIST!','#0ff',20);
+      }
+    }
+
     // Rim collision
     var rimY=HOOP.y;
     if(ball.y>rimY-8&&ball.y<rimY+8){
@@ -1842,6 +1958,11 @@ function render(){
   const shooting=shotPhase==='power'||shotPhase==='flying';
   shootFrame=shooting?Math.min(shootFrame+0.03,1):0;
   drawPlayer(currentPlayer,spot.x,spot.y,shooting,shootFrame);
+
+  // Teammate assist character
+  if(teammate.active&&state==='playing'){
+    drawTeammate(teammate.x,teammate.y,teammate.readyGlow,teammate.waveAnim);
+  }
 
   // Ball in hand
   if(shotPhase==='aim'||shotPhase==='power'){
