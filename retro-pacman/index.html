@@ -218,7 +218,7 @@
     bottom: 20px;
     width: 70px;
     height: 70px;
-    font-size: 14px;
+    font-size: 18px;
     letter-spacing: 1px;
   }
   @media (pointer: coarse) {
@@ -227,7 +227,10 @@
       justify-content: flex-start;
       padding-bottom: calc(170px + env(safe-area-inset-bottom, 0px));
     }
-    #gameWrap { margin-top: 6px; }
+    #gameWrap {
+      margin-top: 6px;
+      margin-bottom: calc(170px + env(safe-area-inset-bottom, 0px));
+    }
     #touchControls { display: block; }
     #hud { padding-right: 84px; }
     #overlay .rules { font-size: 10px; }
@@ -702,7 +705,7 @@ function updatePacman(dt, mazeObj) {
   const centerX = tileCenterX(tile.col);
   const centerY = tileCenterY(tile.row);
 
-  if (Math.abs(pacman.x - centerX) < 3 && Math.abs(pacman.y - centerY) < 3) {
+  if (Math.abs(pacman.x - centerX) < TILE * 0.5 && Math.abs(pacman.y - centerY) < TILE * 0.5) {
     pacman.x = centerX;
     pacman.y = centerY;
 
@@ -728,7 +731,7 @@ function updatePacman(dt, mazeObj) {
   const step = pacman.speed * dt;
   const nx = pacman.x + pacman.dirX * step;
   const ny = pacman.y + pacman.dirY * step;
-  if (canOccupy(mazeObj, nx, ny, pacman.radius)) {
+  if (canOccupy(mazeObj, nx, ny, pacman.radius * 0.8)) {
     pacman.x = nx;
     pacman.y = ny;
   }
