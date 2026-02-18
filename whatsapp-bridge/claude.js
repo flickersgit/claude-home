@@ -1,11 +1,15 @@
 'use strict';
 
 // ---------------------------------------------------------------------------
-// Claude integration — two-phase plan / execute using Claude Code SDK
+// Mochi — plan phase uses Claude Code SDK; execute phase uses Codex CLI
 // ---------------------------------------------------------------------------
 
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
+
+const CODEX_PATH = process.env.CODEX_PATH || '/usr/local/bin/codex';
+const CODEX_MODEL = process.env.CODEX_MODEL || null; // null = codex default
 
 const PROJECT_DIR = process.env.PROJECT_DIR || path.join(__dirname, '..');
 const CLAUDE_PATH = process.env.CLAUDE_PATH || '/Users/statpods/.local/bin/claude';
@@ -130,6 +134,11 @@ function sanitize(text) {
     .replace(/\/Users\/[^/\s]+/g, '~');
   if (s.length > 1500) s = s.slice(0, 1497) + '…';
   return s;
+}
+
+function stripAnsi(str) {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1B\[[0-9;]*[mGKHFABCDJrs]/g, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -293,66 +302,62 @@ async function compactSession(sessionId) {
 // ---------------------------------------------------------------------------
 // Phase 2: execute the plan (full tools) — Sonnet → Opus
 // ---------------------------------------------------------------------------
-async function executePlan(instruction, sessionId) {
-  const baseOpts = {
-    cwd: PROJECT_DIR,
-    allowedTools: ['Read', 'Edit', 'Write', 'MultiEdit', 'Bash', 'Glob', 'Grep'],
-    permissionMode: 'bypassPermissions',
-    allowedDangerouslySkipPermissions: true,
-    maxTurns: 30,
-    systemPrompt: buildSystemPrompt(),
-    pathToClaudeCodeExecutable: CLAUDE_PATH,
-  };
-
-  const prompt = `The user confirmed the plan. Now execute it.
-
-Original instruction: ${instruction}
+// ---------------------------------------------------------------------------
+// Phase 2: execute via Codex CLI (non-interactive, full access)
+// ---------------------------------------------------------------------------
+async function executePlan(instruction) {
+  const prompt = `${instruction}
 
 After making all file changes:
-1. Run: git add <all changed files — list them explicitly, do NOT use git add . or git add -A>
-2. Run: git commit -m "feat: <brief description>"
-3. Run: git push
-4. Run: wrangler pages deploy . --project-name game-arcade --branch staging
-   This deploys to a staging preview. Capture the deployment URL from the wrangler output.
-   It will look like: https://staging.game-arcade.pages.dev
+1. git add <all changed files explicitly — never use git add -A or git add .>
+2. git commit -m "feat: <brief description>"
+3. git push
+4. wrangler pages deploy . --project-name game-arcade --branch staging
+   Capture the staging URL from the wrangler output.
 
 Do NOT add or commit: whatsapp-bridge/MEMORY.md, whatsapp-bridge/SOUL.md, whatsapp-bridge/HEARTBEAT.md
 
-Then report results using this exact format:
+When done, output these lines:
 FILES: <comma-separated list of changed files>
 COMMIT: <hash> — <commit message>
-STAGING: <staging URL from wrangler output>
+STAGING: <staging URL>
 
-If any step fails, report:
+If any step fails:
 STEP_OK: <succeeded step>
 STEP_FAIL: <failed step> | <error message>`;
 
-  let currentSessionId = sessionId;
-  let lastErr;
+  const args = ['exec', '-', '-s', 'danger-full-access'];
+  if (CODEX_MODEL) args.push('-m', CODEX_MODEL);
 
-  for (const model of EXEC_MODELS) {
-    try {
-      const opts = { ...baseOpts, model };
-      if (currentSessionId) opts.resume = currentSessionId;
+  return new Promise((resolve, reject) => {
+    const proc = spawn(CODEX_PATH, args, {
+      cwd: PROJECT_DIR,
+      env: { ...process.env, HOME: process.env.HOME || '/Users/statpods' },
+    });
 
-      const { text, sessionId: sid } = await runQuery(prompt, opts);
+    proc.stdin.write(prompt);
+    proc.stdin.end();
 
-      if (text) {
-        console.log(`[claude] exec: ✓ ${model}`);
-        const parsed = parseResult(text);
-        return { ...parsed, sessionId: sid };
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (chunk) => { stdout += chunk; });
+    proc.stderr.on('data', (chunk) => { stderr += chunk; });
+
+    proc.on('error', (err) => reject(new Error(`codex not found: ${err.message}`)));
+
+    proc.on('close', (code) => {
+      const text = stripAnsi(stdout);
+      console.log(`[codex] exec done (exit ${code}, ${text.length} chars output)`);
+
+      if (!text && code !== 0) {
+        reject(new Error(sanitize(stderr) || `codex exited with code ${code}`));
+        return;
       }
 
-      console.log(`[claude] exec: ${model} returned empty — escalating`);
-    } catch (err) {
-      lastErr = err;
-      console.log(`[claude] exec: ${model} failed (${err.message}) — escalating`);
-    }
-
-    currentSessionId = null;
-  }
-
-  throw lastErr || new Error('All models failed to execute the plan');
+      const parsed = parseResult(text);
+      resolve({ ...parsed, sessionId: null, raw: sanitize(text) });
+    });
+  });
 }
 
 module.exports = { generatePlan, executePlan, compactSession, COMPACTION_THRESHOLD };
