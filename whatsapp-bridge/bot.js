@@ -384,15 +384,27 @@ async function processInstruction(chatId, instruction) {
 // ---------------------------------------------------------------------------
 // Execute a confirmed plan — with 15-minute timeout
 // ---------------------------------------------------------------------------
+const PROGRESS_INTERVAL_MS = 3 * 60 * 1000; // ping every 3 minutes
+
 async function doExecute(chatId, state) {
   setState(chatId, { status: 'executing' });
   await client.sendMessage(chatId, mochi.confirmExecuting());
 
   let execResult;
   let timedOut = false;
+  const startTime = Date.now();
+
+  // Progress pings so the user knows it's still running
+  const progressHandle = setInterval(async () => {
+    const elapsed = Math.round((Date.now() - startTime) / 60000);
+    try {
+      await client.sendMessage(chatId, `⏳ Still working... (${elapsed} min elapsed)`);
+    } catch {}
+  }, PROGRESS_INTERVAL_MS);
 
   const timeoutHandle = setTimeout(async () => {
     timedOut = true;
+    clearInterval(progressHandle);
     clearPendingPlan(chatId);
     console.error('[claude] executePlan timed out after 15 minutes');
     try {
@@ -406,11 +418,15 @@ async function doExecute(chatId, state) {
     clearTimeout(timeoutHandle);
     if (timedOut) return;
     console.error('[claude] executePlan error:', err);
+    clearInterval(progressHandle);
+    clearTimeout(timeoutHandle);
+    if (timedOut) return;
     clearPendingPlan(chatId);
     await client.sendMessage(chatId, mochi.errorReport(err.message));
     return;
   }
 
+  clearInterval(progressHandle);
   clearTimeout(timeoutHandle);
   if (timedOut) return;
 
