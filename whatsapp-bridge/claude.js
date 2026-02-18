@@ -242,7 +242,9 @@ TYPE: task  — if it requires actually building, editing, fixing, or deploying 
 Reply with EXACTLY "TYPE: chat" or "TYPE: task" on the first line.
 
 If TYPE: chat — write a direct, friendly reply on the following lines. Be conversational, helpful, and concise. No plan format needed.
-If TYPE: task — describe what you would do: list the files to create/modify and what changes to make. Be concise (3–6 bullet points). This is shown to the owner for confirmation before execution.`;
+If TYPE: task — describe what you would do: list the files to create/modify and what changes to make. Be concise (3–6 bullet points). This is shown to the owner for confirmation before execution.
+
+IMPORTANT for TYPE: task: Do NOT ask clarifying questions. The owner will simply reply "yes" or "no" to confirm — there is no room for back-and-forth. Instead, make reasonable assumptions, state them briefly as "Assuming: ..." in the plan, and proceed. Never end the plan with a question.`;
 
   let currentSessionId = sessionId;
   let lastErr;

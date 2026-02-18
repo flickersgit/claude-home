@@ -9,7 +9,7 @@ const http = require('http');
 const { exec } = require('child_process');
 const path = require('path');
 
-const { getState, setState, clearPendingPlan, isPlanExpired } = require('./state');
+const { getState, setState, clearPendingPlan, isPlanExpired, getAllChatIds } = require('./state');
 const mochi = require('./mochi');
 const { generatePlan, executePlan, compactSession, COMPACTION_THRESHOLD } = require('./claude');
 const heartbeat = require('./heartbeat');
@@ -136,6 +136,24 @@ client.on('disconnected', async (reason) => {
 // On ready: check for missed messages
 // ---------------------------------------------------------------------------
 async function handleReconnect() {
+  // Recover orphaned 'executing' states — execution process was killed by restart
+  for (const chatId of getAllChatIds()) {
+    const s = getState(chatId);
+    if (s.status === 'executing' && s.pendingPlan) {
+      setState(chatId, { status: 'awaiting_confirm', expiresAt: Date.now() + PLAN_EXPIRY_MS });
+      const name = getName(chatId);
+      const hey = name ? `Hey ${name}!` : 'Hey!';
+      try {
+        await client.sendMessage(chatId,
+          `${hey} I restarted while working on your task. Here's the plan I had ready:\n\n${s.pendingPlan}\n\nReply *yes* to retry, or *no* to cancel.`
+        );
+        console.log(`[reconnect] Restored orphaned execution for ${chatId}`);
+      } catch (err) {
+        console.error(`[reconnect] Could not notify ${chatId} about orphaned execution:`, err.message);
+      }
+    }
+  }
+
   try {
     const chat = await client.getChatById(OWNER_NUMBER);
     if (!chat) return;
@@ -445,22 +463,27 @@ async function doExecute(chatId, state) {
     return;
   }
 
-  // Staged successfully — wait for prod sign-off
-  if (execResult.success && execResult.stagingUrl) {
+  // Always gate on staging for successful executions — wait for prod sign-off
+  if (execResult.success) {
     setState(chatId, {
       status: 'awaiting_staging_confirm',
       pendingPlan: null,
       pendingInstruction: null,
       expiresAt: null,
       claudeSessionId: execResult.sessionId,
-      stagingUrl: execResult.stagingUrl,
+      stagingUrl: execResult.stagingUrl || null,
     });
-    await client.sendMessage(chatId, mochi.stagingReady(execResult.stagingUrl));
+    await client.sendMessage(chatId, mochi.stagingReady({
+      stagingUrl: execResult.stagingUrl,
+      filesChanged: execResult.filesChanged,
+      commitHash: execResult.commitHash,
+      commitMessage: execResult.commitMessage,
+    }));
     heartbeat.flushQueue(client, OWNER_NUMBER);
     return;
   }
 
-  // No staging URL captured — fall back to direct success/error report
+  // Execution failed — report error and go idle
   setState(chatId, {
     status: 'idle',
     pendingPlan: null,
@@ -470,15 +493,7 @@ async function doExecute(chatId, state) {
     stagingUrl: null,
   });
 
-  const reply = execResult.success
-    ? mochi.successReport({
-        filesChanged: execResult.filesChanged,
-        commitHash: execResult.commitHash,
-        commitMessage: execResult.commitMessage,
-      })
-    : mochi.errorReport(execResult.raw || 'Unknown error during execution.');
-
-  await client.sendMessage(chatId, reply);
+  await client.sendMessage(chatId, mochi.errorReport(execResult.raw || 'Unknown error during execution.'));
 
   // Deliver any queued heartbeat alerts after execution completes
   heartbeat.flushQueue(client, OWNER_NUMBER);

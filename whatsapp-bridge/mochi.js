@@ -151,8 +151,15 @@ function successReport({ filesChanged, commitHash, commitMessage }) {
   return `✅ Done!\nFiles: ${fileList}${commitLine}\nLive at: game-arcade.graciebelle.cc`;
 }
 
-function stagingReady(stagingUrl) {
-  return `🧪 Staged! Test it here:\n${stagingUrl}\n\nLooks good?\n• yes — ship to production\n• no — leave it staged for now\n• revert — undo the changes`;
+function stagingReady({ stagingUrl, filesChanged, commitHash, commitMessage } = {}) {
+  const fileList = filesChanged && filesChanged.length
+    ? filesChanged.slice(0, 5).join(', ') + (filesChanged.length > 5 ? ` (+${filesChanged.length - 5} more)` : '')
+    : null;
+  const commitLine = commitHash ? `Commit: ${commitHash.slice(0, 7)} — ${commitMessage || 'changes applied'}` : null;
+  const urlLine = stagingUrl ? `Test it here:\n${stagingUrl}` : null;
+
+  const details = [fileList && `Files: ${fileList}`, commitLine, urlLine].filter(Boolean).join('\n');
+  return `🧪 Done! Changes staged and committed.\n${details}\n\nLooks good?\n• yes — ship to production\n• no — leave it staged for now\n• revert — undo the changes`;
 }
 
 function shippingToProd() {

@@ -77,6 +77,10 @@ function isPlanExpired(state) {
   );
 }
 
+function getAllChatIds() {
+  return [...store.keys()];
+}
+
 loadFromDisk();
 
-module.exports = { getState, setState, clearPendingPlan, isPlanExpired };
+module.exports = { getState, setState, clearPendingPlan, isPlanExpired, getAllChatIds };
