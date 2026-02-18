@@ -8,8 +8,8 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;height:100dvh;overflow:hidden;font-family:'Courier New',monospace;flex-direction:column}
 canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.home-btn{position:fixed;top:12px;right:60px;z-index:999;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.5);border:1.5px solid rgba(255,200,0,0.4);color:rgba(255,200,0,0.8);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;line-height:1;transition:opacity 0.3s,background 0.2s;opacity:0.5}
-.home-btn:hover,.home-btn:active{opacity:1;background:rgba(255,200,0,0.15)}
+.home-btn{position:fixed;top:8px;right:60px;z-index:999;min-width:48px;min-height:48px;border-radius:8px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.5);color:#fff;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;-webkit-tap-highlight-color:transparent;user-select:none;transition:background 0.1s}
+.home-btn:hover,.home-btn:active{background:rgba(255,255,0,0.35);border-color:#ff0}
 #touch-controls{display:none;position:fixed;bottom:env(safe-area-inset-bottom, 0px);left:0;width:100%;pointer-events:none;z-index:10;padding:10px;box-sizing:border-box}
 #touch-controls.active{display:flex;justify-content:space-between;align-items:flex-end}
 .touch-btn{pointer-events:auto;min-width:56px;min-height:56px;border:2px solid rgba(255,255,255,0.5);border-radius:12px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Courier New',monospace;font-size:13px;font-weight:bold;text-align:center;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none;-webkit-user-select:none;transition:background 0.1s}
@@ -31,7 +31,7 @@ canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radi
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 2L4 7L9 12"/></svg></a>
+<a href="../" class="home-btn" title="Back to Arcade">BACK</a>
 <canvas id="game"></canvas>
 <!-- Touch controls for mobile -->
 <button class="touch-btn" id="btn-back" style="display:none">ESC</button>

@@ -26,15 +26,16 @@
   }
   .home-btn {
     position: fixed; top: 12px; right: 12px; z-index: 999;
-    width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(0,0,0,0.5); border: 1.5px solid rgba(0,255,204,0.4);
-    color: rgba(0,255,204,0.8); font-size: 16px; cursor: pointer;
+    width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4);
+    color: #fff; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    text-decoration: none; line-height: 1;
-    transition: opacity 0.3s, background 0.2s;
-    opacity: 0.5;
+    text-decoration: none; user-select: none;
+    font-family: sans-serif; font-size: 10px; font-weight: bold; letter-spacing: 1px;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s;
   }
-  .home-btn:hover, .home-btn:active { opacity: 1; background: rgba(0,255,204,0.15); }
+  .home-btn:active { background: rgba(255,255,255,0.35); }
   /* Mobile touch controls */
   #touch-controls {
     display: none;
@@ -169,7 +170,7 @@
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 2L4 7L9 12"/></svg></a>
+<a href="../" class="home-btn" title="Back to Arcade">BACK</a>
 
 <div id="menu">
   <h1>OBBY</h1>
