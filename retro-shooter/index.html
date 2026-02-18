@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>GALACTIC DEFENDER - Retro Shooter</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -132,7 +132,7 @@ h2 {
 #joystick-zone {
   position: absolute;
   left: 10px;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   width: 140px;
   height: 140px;
   pointer-events: all;
@@ -168,7 +168,7 @@ h2 {
 /* Action buttons - right side */
 #btn-fire {
   right: 16px;
-  bottom: 50px;
+  bottom: calc(50px + env(safe-area-inset-bottom, 0px));
   width: 80px;
   height: 80px;
   border-color: rgba(0,255,255,0.5);
@@ -177,7 +177,7 @@ h2 {
 }
 #btn-bomb {
   right: 110px;
-  bottom: 70px;
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   width: 60px;
   height: 60px;
   border-color: rgba(255,100,0,0.5);
