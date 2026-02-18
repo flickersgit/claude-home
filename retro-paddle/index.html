@@ -55,13 +55,41 @@
   }
   #overlay.hidden { opacity: 0; pointer-events: none; }
   #overlay h1 {
-    font-size: 36px; color: #cc44ff;
+    font-size: 36px;
+    color: #cc44ff;
+    letter-spacing: 6px;
     text-shadow: 0 0 20px #cc44ff, 0 0 40px #8800cc;
-    letter-spacing: 6px; margin-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  #overlay .title-frame {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 20px 10px;
+    border: 2px solid rgba(204,68,255,0.45);
+    background: linear-gradient(180deg, rgba(24,8,35,0.8), rgba(10,4,16,0.65));
+    box-shadow: 0 0 24px rgba(204,68,255,0.22), inset 0 0 28px rgba(204,68,255,0.08);
+  }
+  #overlay .title-main {
+    font-size: clamp(30px, 8vw, 42px);
+    line-height: 1;
+    color: #cc44ff;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px #cc44ff, 0 0 34px #8800cc;
+  }
+  #overlay .title-accent {
+    font-size: clamp(11px, 2.8vw, 13px);
+    color: #ff6fc6;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px #ff44aa;
   }
   #overlay h2 {
     font-size: 14px; color: #ff44aa; margin-bottom: 20px;
     letter-spacing: 4px; text-shadow: 0 0 8px #ff44aa;
+    padding: 5px 12px;
+    border: 1px solid rgba(255,68,170,0.35);
+    background: rgba(255,68,170,0.08);
   }
   #overlay .info {
     font-size: 11px; color: #aa88ff; margin: 3px 0; letter-spacing: 1px;
@@ -178,7 +206,12 @@
     <span class="lives">LIVES: <span id="livesVal">♥♥♥</span></span>
   </div>
   <div id="overlay">
-    <h1>NEON BREAKER</h1>
+    <h1>
+      <span class="title-frame">
+        <span class="title-main">NEON BREAKER</span>
+        <span class="title-accent">ARCADE EDITION</span>
+      </span>
+    </h1>
     <h2>★ BRICK SMASHER ★</h2>
     <div class="info">Arrow Keys / WASD / Joystick to move</div>
     <div class="info">SPACE / Tap Launch to release ball</div>
