@@ -3,7 +3,9 @@
 require('dotenv').config();
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
+const http = require('http');
+const { exec } = require('child_process');
 
 const { getState, setState, clearPendingPlan, isPlanExpired } = require('./state');
 const mochi = require('./mochi');
@@ -46,13 +48,37 @@ const client = new Client({
 // ---------------------------------------------------------------------------
 // Auth / lifecycle events
 // ---------------------------------------------------------------------------
-client.on('qr', (qr) => {
-  console.log('\n[auth] Scan this QR code with Mochi\'s WhatsApp:\n');
-  qrcode.generate(qr, { small: true });
+// Serve QR code in browser for easy scanning
+let qrServer = null;
+client.on('qr', async (qr) => {
+  console.log('[auth] QR code ready — opening in browser...');
+  const dataUrl = await QRCode.toDataURL(qr, { width: 400, margin: 2 });
+  const html = `<!DOCTYPE html><html><head><title>Mochi QR</title>
+<style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background:#111;color:#fff;font-family:sans-serif;}
+img{border:12px solid #fff;border-radius:12px;}p{margin-top:20px;opacity:.6;font-size:14px;}</style></head>
+<body><img src="${dataUrl}"><p>Scan with Mochi's WhatsApp → Settings → Linked Devices → Link a Device</p></body></html>`;
+
+  if (!qrServer) {
+    qrServer = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    });
+    qrServer.listen(3131, () => {
+      exec('open http://localhost:3131');
+    });
+  } else {
+    // Update the served HTML for the new QR (refresh page to see it)
+    qrServer.removeAllListeners('request');
+    qrServer.on('request', (req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    });
+  }
 });
 
 client.on('authenticated', () => {
   console.log('[auth] Session authenticated and saved');
+  if (qrServer) { qrServer.close(); qrServer = null; }
 });
 
 client.on('auth_failure', (msg) => {
