@@ -95,12 +95,27 @@
   /* Touch controls */
   #touchControls {
     display: none;
-    position: fixed; bottom: 0; left: 0; right: 0; height: 160px;
-    z-index: 100; pointer-events: none;
+    width: 100%; height: 130px;
+    pointer-events: none;
+    flex-shrink: 0;
   }
   @media (pointer: coarse) {
-    #touchControls { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
-    body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    body {
+      flex-direction: column;
+      padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    }
+    #gameContainer {
+      flex-shrink: 1; min-height: 0;
+      max-height: calc(100dvh - 130px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    }
+    canvas {
+      max-height: calc(100dvh - 130px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      width: auto;
+    }
+    #touchControls {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 16px;
+    }
   }
   #joystick {
     width: 120px; height: 120px; pointer-events: auto; touch-action: none;
@@ -161,14 +176,15 @@
     <div class="info">Break all bricks to advance!</div>
     <button class="start-btn" id="startBtn">START</button>
   </div>
-  <div id="touchControls">
-    <div id="joystick">
-      <div id="joystickBase">
-        <div id="joystickKnob"></div>
-      </div>
+
+</div>
+<div id="touchControls">
+  <div id="joystick">
+    <div id="joystickBase">
+      <div id="joystickKnob"></div>
     </div>
-    <button id="launchBtn">LAUNCH</button>
   </div>
+  <button id="launchBtn">LAUNCH</button>
 </div>
 
 <script>
