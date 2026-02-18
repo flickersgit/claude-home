@@ -236,7 +236,7 @@ async function generatePlan(instruction, sessionId) {
   const prompt = `The owner sent you this message: "${instruction}"
 
 First, decide which type this is:
-TYPE: chat  — if it's a question, opinion, small talk, or anything that does NOT require creating or modifying project files
+TYPE: chat  — if it's a question, opinion, small talk, or anything that does NOT require creating or modifying project files. Also use this if the message is a short ambiguous word like "yes", "no", "ok", "sure", "done" with no clear context — just ask what they mean.
 TYPE: task  — if it requires actually building, editing, fixing, or deploying something in the project
 
 Reply with EXACTLY "TYPE: chat" or "TYPE: task" on the first line.

@@ -431,7 +431,11 @@ async function doExecute(chatId, state) {
   }, EXECUTION_TIMEOUT_MS);
 
   try {
-    execResult = await executePlan(state.pendingInstruction, state.claudeSessionId);
+    // Pass the full plan (with assumptions) to Codex, not just the raw instruction
+    const execInstruction = state.pendingPlan
+      ? `Original request: ${state.pendingInstruction}\n\nPlan to execute:\n${state.pendingPlan}`
+      : state.pendingInstruction;
+    execResult = await executePlan(execInstruction, state.claudeSessionId);
   } catch (err) {
     clearTimeout(timeoutHandle);
     if (timedOut) return;
