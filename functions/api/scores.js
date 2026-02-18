@@ -1,4 +1,4 @@
-const VALID_GAMES = ['retro-basket', 'retro-shooter', 'retro-racing', 'retro-paddle', 'obby', 'street-fighter'];
+const VALID_GAMES = ['retro-basket', 'retro-shooter', 'retro-racing', 'retro-paddle', 'retro-pacman', 'obby', 'street-fighter'];
 const ASC_GAMES = ['obby']; // lower = better
 
 export async function onRequestPost(context) {
