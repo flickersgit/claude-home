@@ -27,7 +27,13 @@ if (!OWNER_NUMBER) {
   process.exit(1);
 }
 
-console.log(`[boot] Starting Mochi... Owner: ${OWNER_NUMBER}`);
+// Allow list — OWNER_NUMBER is always included; add more via ALLOWED_NUMBERS="num1,num2"
+const ALLOWED_NUMBERS = new Set([
+  OWNER_NUMBER,
+  ...((process.env.ALLOWED_NUMBERS || '').split(',').map(n => n.trim()).filter(Boolean)),
+]);
+
+console.log(`[boot] Starting Mochi... Owner: ${OWNER_NUMBER}, allowed: ${ALLOWED_NUMBERS.size} number(s)`);
 
 // ---------------------------------------------------------------------------
 // WhatsApp client
@@ -144,8 +150,8 @@ async function handleReconnect() {
 client.on('message', async (msg) => {
   console.log(`[msg] from=${msg.from} fromMe=${msg.fromMe} type=${msg.type} body=${(msg.body||'').slice(0,50)}`);
   if (msg.fromMe) return;
-  if (msg.from !== OWNER_NUMBER) {
-    console.log(`[msg] dropped — expected ${OWNER_NUMBER}`);
+  if (!ALLOWED_NUMBERS.has(msg.from)) {
+    console.log(`[msg] dropped — ${msg.from} not in allow list`);
     return;
   }
 
