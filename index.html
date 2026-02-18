@@ -284,6 +284,10 @@
     --cabinet-shadow: 0 0 30px rgba(0,204,255,0.15), 0 8px 32px rgba(0,0,0,0.6);
     --cabinet-shadow-bright: 0 0 50px rgba(0,204,255,0.25), 0 8px 32px rgba(0,0,0,0.6);
   }
+  .cabinet:nth-child(5) { animation-delay: 2.3s, 1.1s; --glow: #cc44ff; --accent: #cc44ff;
+    --cabinet-shadow: 0 0 30px rgba(204,68,255,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    --cabinet-shadow-bright: 0 0 50px rgba(204,68,255,0.25), 0 8px 32px rgba(0,0,0,0.6);
+  }
 
   .cabinet:hover {
     transform: translateY(-8px) scale(1.02);
@@ -574,6 +578,33 @@
     background: linear-gradient(to bottom, rgba(0,136,255,0.4), transparent);
   }
 
+  /* ── Neon Breaker scene ── */
+  .scene-breaker {
+    --screen-bg: #06040c;
+    background: linear-gradient(180deg, #06040c, #0c0818);
+  }
+  .scene-breaker .br-brick {
+    position: absolute;
+    height: 8px;
+    border-radius: 1px;
+  }
+  .scene-breaker .br-paddle {
+    position: absolute; bottom: 18%;
+    left: 50%; transform: translateX(-50%);
+    width: 36px; height: 8px;
+    background: #cc44ff;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(204,68,255,0.6);
+  }
+  .scene-breaker .br-ball {
+    position: absolute; bottom: 28%; left: 48%;
+    width: 7px; height: 7px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ff44aa, 0 0 16px rgba(255,68,170,0.4);
+    animation: star-twinkle 0.6s ease-in-out infinite;
+  }
+
   /* ── Card info area ── */
   .cabinet-info {
     padding: 18px 18px 14px;
@@ -652,6 +683,7 @@
   .cabinet:nth-child(2) .screen-content { animation: screen-on 0.6s 0.7s both; }
   .cabinet:nth-child(3) .screen-content { animation: screen-on 0.6s 0.9s both; }
   .cabinet:nth-child(4) .screen-content { animation: screen-on 0.6s 1.1s both; }
+  .cabinet:nth-child(5) .screen-content { animation: screen-on 0.6s 1.3s both; }
 
   /* ── Responsive tweaks ── */
   @media (max-width: 500px) {
@@ -678,7 +710,7 @@
   <!-- Marquee ticker -->
   <div class="marquee-bar">
     <div class="marquee-text">
-      ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ 4 GAMES READY TO PLAY ★ HIGH SCORES WELCOME ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★
+      ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ NEON BREAKER ★ 5 GAMES READY TO PLAY ★ HIGH SCORES WELCOME ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ NEON BREAKER ★
     </div>
   </div>
 
@@ -822,11 +854,44 @@
       </div>
     </a>
 
+    <!-- 5. Neon Breaker -->
+    <a href="retro-paddle/" class="cabinet">
+      <div class="cabinet-screen">
+        <div class="cabinet-bezel">
+          <div class="screen-content">
+            <div class="pixel-scene scene-breaker">
+              <div class="br-brick" style="top:12%;left:8%;width:28px;background:#ff2266"></div>
+              <div class="br-brick" style="top:12%;left:22%;width:28px;background:#ff4488"></div>
+              <div class="br-brick" style="top:12%;left:36%;width:28px;background:#ff6644"></div>
+              <div class="br-brick" style="top:12%;left:50%;width:28px;background:#ffaa00"></div>
+              <div class="br-brick" style="top:12%;left:64%;width:28px;background:#ffcc00"></div>
+              <div class="br-brick" style="top:22%;left:8%;width:28px;background:#44ff66"></div>
+              <div class="br-brick" style="top:22%;left:22%;width:28px;background:#00ccff"></div>
+              <div class="br-brick" style="top:22%;left:36%;width:28px;background:#cc44ff"></div>
+              <div class="br-brick" style="top:22%;left:50%;width:28px;background:#ff44aa"></div>
+              <div class="br-brick" style="top:22%;left:64%;width:28px;background:#8866ff"></div>
+              <div class="br-brick" style="top:32%;left:15%;width:28px;background:#ff2266"></div>
+              <div class="br-brick" style="top:32%;left:36%;width:28px;background:#00ccff"></div>
+              <div class="br-brick" style="top:32%;left:57%;width:28px;background:#ffaa00"></div>
+              <div class="br-ball"></div>
+              <div class="br-paddle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cabinet-info">
+        <div class="game-title">NEON BREAKER</div>
+        <div class="game-tag">Breakout</div>
+        <div class="game-desc">Smash neon bricks with your paddle! Power-ups, multi-ball, lasers, 7 levels. How far can you go?</div>
+        <div class="play-prompt">PLAY</div>
+      </div>
+    </a>
+
   </div>
 
   <!-- Bottom bar -->
   <div class="bottom-bar">
-    <span>4 GAMES LOADED</span>
+    <span>5 GAMES LOADED</span>
     <span class="credits">CREDITS: 99</span>
   </div>
 
