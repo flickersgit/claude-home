@@ -62,11 +62,34 @@
   .shooter h2 { color: #0f0; }
   .obby h2 { color: #4af; }
   .racing h2 { color: #33ff33; }
+  .trailer-section {
+    max-width: 900px;
+    width: 100%;
+    margin-bottom: 40px;
+  }
+  .trailer-section video {
+    width: 100%;
+    border-radius: 16px;
+    border: 1px solid #333;
+    box-shadow: 0 0 40px rgba(255,50,100,0.15);
+  }
+  .trailer-label {
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-top: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
   <h1>GAME ARCADE</h1>
   <p class="sub">Pick a game and play!</p>
+  <div class="trailer-section">
+    <video src="trailer.mp4" autoplay muted loop playsinline></video>
+    <p class="trailer-label">AI-generated trailer powered by Seedance</p>
+  </div>
   <div class="games">
     <a href="retro-basket/" class="card basket">
       <div class="emoji">🏀</div>
