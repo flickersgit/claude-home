@@ -304,6 +304,7 @@ const BOARD_H = ROWS * TILE;
 const BOARD_X = Math.floor((canvas.width - BOARD_W) / 2);
 const BOARD_Y = 88;
 const MAZE_INTERVAL = 60;
+const READY_DELAY = 1.2;
 const GHOST_COLORS = ['#ff4242', '#ff99d4', '#4fd7ff', '#ffb347'];
 const GHOST_NAMES = ['Blinky', 'Pinky', 'Inky', 'Clyde'];
 
@@ -474,6 +475,7 @@ let mazeTimer = MAZE_INTERVAL;
 let regenCount = 0;
 let ghostCombo = 0;
 let pendingLeaderboardScore = null;
+let readyTimer = READY_DELAY;
 
 const input = {
   left: false,
@@ -583,6 +585,7 @@ function resetRound(fullReset) {
   mazeTimer = MAZE_INTERVAL;
   ghostCombo = 0;
   resetPositions(false);
+  readyTimer = READY_DELAY;
   updateHUD();
 }
 
@@ -611,6 +614,9 @@ document.addEventListener('keydown', (e) => {
   handleKeyboard(true, e.code);
 });
 document.addEventListener('keyup', (e) => handleKeyboard(false, e.code));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state === 'playing') state = 'paused';
+});
 
 function bindTouchBtn(id, dx, dy) {
   const btn = document.getElementById(id);
@@ -642,6 +648,26 @@ pauseBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); togglePaus
 
 canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeStartTs = 0;
+canvas.addEventListener('touchstart', (e) => {
+  if (!e.touches || !e.touches[0]) return;
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+  swipeStartTs = performance.now();
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => {
+  if (!e.changedTouches || !e.changedTouches[0]) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  const distance = Math.hypot(dx, dy);
+  const elapsed = performance.now() - swipeStartTs;
+  if (distance < 18 || elapsed > 380) return;
+  if (Math.abs(dx) > Math.abs(dy)) setMoveIntent(dx > 0 ? 1 : -1, 0);
+  else setMoveIntent(0, dy > 0 ? 1 : -1);
+}, { passive: false });
 
 function pickGhostDirection(g, mazeObj) {
   const tile = worldToTile(g.x, g.y);
@@ -807,8 +833,9 @@ function updateGhosts(dt, mazeObj) {
           endGame();
           return;
         }
-        pacman.invuln = 2;
-        resetPositions(true);
+        pacman.invuln = 1.2;
+        resetPositions(false);
+        readyTimer = READY_DELAY;
       }
     }
   });
@@ -998,6 +1025,14 @@ function drawFrame() {
     ctx.textAlign = 'center';
     ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
   }
+  if (state === 'playing' && readyTimer > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffe347';
+    ctx.font = 'bold 32px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('READY!', canvas.width / 2, canvas.height / 2);
+  }
 
   ctx.fillStyle = 'rgba(255,255,255,0.03)';
   for (let y = 0; y < canvas.height; y += 3) {
@@ -1014,12 +1049,15 @@ function loop(ts) {
   lastTs = ts;
 
   if (state === 'playing') {
+    if (readyTimer > 0) readyTimer -= dt;
     const activeMaze = getActiveMaze();
 
-    mazeTimer -= dt;
-    if (mazeTimer <= 0) {
-      mazeTimer += MAZE_INTERVAL;
-      if (!transition || !transition.active) startMazeTransition();
+    if (readyTimer <= 0) {
+      mazeTimer -= dt;
+      if (mazeTimer <= 0) {
+        mazeTimer += MAZE_INTERVAL;
+        if (!transition || !transition.active) startMazeTransition();
+      }
     }
 
     if (transition && transition.active) {
@@ -1034,8 +1072,10 @@ function loop(ts) {
 
     if (pacman.invuln > 0) pacman.invuln -= dt;
 
-    updatePacman(dt, activeMaze);
-    updateGhosts(dt, activeMaze);
+    if (readyTimer <= 0) {
+      updatePacman(dt, activeMaze);
+      updateGhosts(dt, activeMaze);
+    }
 
     if (activeMaze.pellets.size === 0 && activeMaze.power.size === 0) {
       if (!transition || !transition.active) startMazeTransition();
@@ -1117,6 +1157,11 @@ saveRow.addEventListener('submit', (e) => {
   pendingLeaderboardScore = null;
   saveRow.style.display = 'none';
   renderLeaderboard();
+});
+
+initialsInput.addEventListener('input', () => {
+  const clean = initialsInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
+  initialsInput.value = clean;
 });
 
 renderLeaderboard();
