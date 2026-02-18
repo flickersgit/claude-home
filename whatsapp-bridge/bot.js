@@ -315,29 +315,34 @@ async function processInstruction(chatId, instruction) {
   const newCount = currentCount + 1;
   setState(chatId, { interactionCount: newCount });
 
-  // Generate plan (read-only)
-  let plan, newSessionId;
+  // Classify intent and generate plan/reply
+  let result;
   try {
     const freshState = getState(chatId);
-    const result = await generatePlan(instruction, freshState.claudeSessionId);
-    plan = result.plan;
-    newSessionId = result.sessionId;
+    result = await generatePlan(instruction, freshState.claudeSessionId);
   } catch (err) {
     console.error('[claude] generatePlan error:', err);
     await client.sendMessage(chatId, mochi.errorReport(err.message));
     return;
   }
 
-  // Store plan state
+  // Conversational reply — no plan confirmation needed
+  if (result.type === 'chat') {
+    setState(chatId, { claudeSessionId: result.sessionId });
+    await client.sendMessage(chatId, result.reply);
+    return;
+  }
+
+  // Task — store plan and await confirmation
   setState(chatId, {
     status: 'awaiting_confirm',
-    pendingPlan: plan,
+    pendingPlan: result.plan,
     pendingInstruction: instruction,
     expiresAt: Date.now() + PLAN_EXPIRY_MS,
-    claudeSessionId: newSessionId,
+    claudeSessionId: result.sessionId,
   });
 
-  await client.sendMessage(chatId, mochi.planMessage(plan));
+  await client.sendMessage(chatId, mochi.planMessage(result.plan));
 }
 
 // ---------------------------------------------------------------------------

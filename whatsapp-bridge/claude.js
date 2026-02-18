@@ -194,6 +194,23 @@ async function runQuery(prompt, options) {
 // ---------------------------------------------------------------------------
 // Phase 1: generate a plan (read-only tools) — Haiku → Sonnet → Opus
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Parse intent classification from generatePlan response
+// Returns { type: 'chat'|'task', reply?, plan? }
+// ---------------------------------------------------------------------------
+function parseIntent(text) {
+  const lines = text.split('\n');
+  const first = lines[0].trim();
+
+  if (first === 'TYPE: chat') {
+    return { type: 'chat', reply: lines.slice(1).join('\n').trim() };
+  }
+
+  // TYPE: task — strip the header line if present
+  const plan = first === 'TYPE: task' ? lines.slice(1).join('\n').trim() : text;
+  return { type: 'task', plan };
+}
+
 async function generatePlan(instruction, sessionId) {
   const baseOpts = {
     cwd: PROJECT_DIR,
@@ -204,9 +221,16 @@ async function generatePlan(instruction, sessionId) {
     pathToClaudeCodeExecutable: CLAUDE_PATH,
   };
 
-  const prompt = sessionId
-    ? `New instruction: ${instruction}\n\nDescribe what you would do to fulfill this request. List the files you'd create or modify, and what changes you'd make. Be concise — this is for a WhatsApp confirmation message.`
-    : `You are working on the game-arcade project. The user wants you to: ${instruction}\n\nDescribe what you would do to fulfill this request. List the files you'd create or modify, and what changes you'd make. Be concise — this is for a WhatsApp confirmation message.`;
+  const prompt = `The owner sent you this message: "${instruction}"
+
+First, decide which type this is:
+TYPE: chat  — if it's a question, opinion, small talk, or anything that does NOT require creating or modifying project files
+TYPE: task  — if it requires actually building, editing, fixing, or deploying something in the project
+
+Reply with EXACTLY "TYPE: chat" or "TYPE: task" on the first line.
+
+If TYPE: chat — write a direct, friendly reply on the following lines. Be conversational, helpful, and concise. No plan format needed.
+If TYPE: task — describe what you would do: list the files to create/modify and what changes to make. Be concise (3–6 bullet points). This is shown to the owner for confirmation before execution.`;
 
   let currentSessionId = sessionId;
   let lastErr;
@@ -218,9 +242,13 @@ async function generatePlan(instruction, sessionId) {
 
       const { text, sessionId: sid } = await runQuery(prompt, opts);
 
-      if (text && text.length >= 30) {
-        console.log(`[claude] plan: ✓ ${model}`);
-        return { plan: sanitize(text), sessionId: sid };
+      if (text && text.length >= 5) {
+        const intent = parseIntent(text);
+        // Sanitize the user-facing content
+        if (intent.type === 'chat') intent.reply = sanitize(intent.reply);
+        else intent.plan = sanitize(intent.plan);
+        console.log(`[claude] plan: ✓ ${model} (${intent.type})`);
+        return { ...intent, sessionId: sid };
       }
 
       console.log(`[claude] plan: ${model} returned empty — escalating`);
