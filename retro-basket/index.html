@@ -474,7 +474,7 @@ let onFire=[false,false];
 let fireTimer=[0,0];
 
 // Teammate assist
-let teammate={x:0,y:0,active:false,assisted:false,readyGlow:0,waveAnim:0};
+let teammate={x:0,y:0,side:'ally',active:false,assisted:false,readyGlow:0,waveAnim:0,assistRange:42,readyRange:120};
 
 // Positions
 const SPOTS=[
@@ -512,25 +512,25 @@ const ENEMY_TYPES={
   defender:{
     name:'DEFENDER',color:'#0f0',accentColor:'#0a0',
     w:20,h:36,speed:1.5,jumpH:60,jumpSpeed:3,
-    points:-2, radius:14
+    points:-2, radius:14, side:'enemy'
   },
   // Drone: flies across screen horizontally, deflects ball
   drone:{
     name:'DRONE',color:'#f0f',accentColor:'#a0a',
     w:24,h:12,speed:2.5,
-    points:-1, radius:12
+    points:-1, radius:12, side:'enemy'
   },
   // Mascot: runs across court waving, speeds up your aim if near you
   mascot:{
     name:'MASCOT',color:'#f80',accentColor:'#a50',
     w:18,h:30,speed:2,
-    points:0, radius:16
+    points:0, radius:16, side:'enemy'
   },
   // Bird: small fast, flies diagonally, can hit ball
   bird:{
     name:'BIRD',color:'#ff0',accentColor:'#aa0',
     w:14,h:10,speed:3.5,
-    points:-1, radius:8
+    points:-1, radius:8, side:'enemy'
   }
 };
 
@@ -551,6 +551,7 @@ function spawnEnemies(){
 
     const e={
       type,
+      side:'enemy',
       active:true,
       timer:Math.random()*Math.PI*2,
       spawnDelay:i*1.5, // stagger spawns
@@ -668,7 +669,7 @@ function updateEnemies(dt){
     }
 
     // Ball collision (deflect ball)
-    if(ball&&shotPhase==='flying'&&!ball.scored&&e.spawned){
+    if(ball&&shotPhase==='flying'&&!ball.scored&&e.spawned&&e.side==='enemy'){
       const et=ENEMY_TYPES[e.type];
       const dist=Math.hypot(ball.x-e.x,ball.y-e.y);
       if(dist<et.radius+ball.radius){
@@ -930,6 +931,12 @@ function drawEnemies(){
         break;
     }
 
+    // Enemy badge so players can clearly tell blockers from ally helper.
+    X.fillStyle='#f44';
+    X.font='bold 7px Courier New';
+    X.textAlign='center';
+    X.fillText('ENEMY',0,-24);
+
     X.restore();
   });
 }
@@ -1015,7 +1022,17 @@ function startShot(){
   const spot=SPOTS[spotIdx]||SPOTS[0];
   const tx=spot.x<HOOP.x?spot.x+80:spot.x-80;
   const ty=Math.max(280,Math.min(spot.y-60,430));
-  teammate={x:Math.max(60,Math.min(tx,W-60)),y:ty,active:true,assisted:false,readyGlow:0,waveAnim:0};
+  teammate={
+    x:Math.max(60,Math.min(tx,W-60)),
+    y:ty,
+    side:'ally',
+    active:true,
+    assisted:false,
+    readyGlow:0,
+    waveAnim:0,
+    assistRange:42,
+    readyRange:120
+  };
 }
 
 function launchBall(){
@@ -1379,6 +1396,11 @@ function drawTeammate(x,y,readyGlow,waveAnim){
     X.fillText('READY!',0,-22);
     X.globalAlpha=1;
   }
+
+  X.fillStyle='#0ff';
+  X.font='bold 7px Courier New';
+  X.textAlign='center';
+  X.fillText('ALLY',0,-28);
 
   X.restore();
 }
@@ -1774,11 +1796,11 @@ function update(dt){
     ball.vy+=ball.gravity;
 
     // Teammate assist: redirect ball toward basket when ball is close
-    if(teammate.active&&!teammate.assisted&&!ball.scored){
+    if(teammate.side==='ally'&&teammate.active&&!teammate.assisted&&!ball.scored){
       const tdist=Math.hypot(ball.x-teammate.x,ball.y-teammate.y);
-      teammate.readyGlow=Math.max(0,1-tdist/120);
+      teammate.readyGlow=Math.max(0,1-tdist/teammate.readyRange);
       teammate.waveAnim+=0.1;
-      if(tdist<40){
+      if(tdist<teammate.assistRange){
         // Assist! redirect ball in an arc toward the basket center
         teammate.assisted=true;
         teammate.active=false;
