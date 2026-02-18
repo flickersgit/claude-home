@@ -246,7 +246,7 @@ let balls = [];
 let bricks = [];
 
 // Paddle
-const paddle = { x: W / 2, y: H - 60, w: 70, h: 12, speed: 7, targetW: 70 };
+const paddle = { x: W / 2, y: H - 60, w: 70, h: 12, speed: 9, targetW: 70 };
 
 // Ball defaults
 const BALL_SPEED = 5;
@@ -388,30 +388,76 @@ const joystickKnob = document.getElementById('joystickKnob');
 let joyX = 0, joyActive = false;
 const jBaseR = 60, jKnobR = 24, jMaxDist = jBaseR - jKnobR;
 
-function updateKnob() {
-  joystickKnob.style.transform = `translate(${joyX * jMaxDist}px, 0px)`;
-}
-function handleJoy(cx) {
+const JOYSTICK_RADIUS = jMaxDist;
+const DEADZONE = 0.12;
+let joyTouchId = null;
+
+function getJoyCenter() {
   const rect = joystickBase.getBoundingClientRect();
-  let dx = cx - (rect.left + rect.width / 2);
-  if (Math.abs(dx) > jMaxDist) dx = Math.sign(dx) * jMaxDist;
-  joyX = dx / jMaxDist;
-  updateKnob();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
-function resetJoy() { joyX = 0; joyActive = false; updateKnob(); }
+
+function updateJoystick(touchX, touchY) {
+  const center = getJoyCenter();
+  let offX = touchX - center.x;
+  let offY = touchY - center.y;
+  const dist = Math.sqrt(offX * offX + offY * offY);
+  if (dist > JOYSTICK_RADIUS) {
+    offX = (offX / dist) * JOYSTICK_RADIUS;
+    offY = (offY / dist) * JOYSTICK_RADIUS;
+  }
+  joystickKnob.style.transform = `translate(${offX}px, ${offY}px)`;
+  const nx = offX / JOYSTICK_RADIUS;
+  joyX = Math.abs(nx) > DEADZONE ? nx : 0;
+}
+
+function resetJoystick() {
+  joystickKnob.style.transform = 'translate(0px, 0px)';
+  joyX = 0; joyActive = false; joyTouchId = null;
+}
 
 joystickBase.addEventListener('touchstart', e => {
-  e.preventDefault(); joyActive = true;
-  handleJoy(e.touches[0].clientX);
-});
-document.addEventListener('touchmove', e => {
-  if (joyActive) { e.preventDefault(); handleJoy(e.touches[0].clientX); }
+  e.preventDefault();
+  if (joyTouchId === null) {
+    const touch = e.changedTouches[0];
+    joyTouchId = touch.identifier;
+    joyActive = true;
+    updateJoystick(touch.clientX, touch.clientY);
+  }
 }, { passive: false });
-document.addEventListener('touchend', () => { if (joyActive) resetJoy(); });
 
-joystickBase.addEventListener('mousedown', e => { e.preventDefault(); joyActive = true; handleJoy(e.clientX); });
-document.addEventListener('mousemove', e => { if (joyActive) handleJoy(e.clientX); });
-document.addEventListener('mouseup', () => { if (joyActive) resetJoy(); });
+joystickBase.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joyTouchId) {
+      updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+      break;
+    }
+  }
+}, { passive: false });
+
+joystickBase.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joyTouchId) { resetJoystick(); break; }
+  }
+}, { passive: false });
+
+joystickBase.addEventListener('touchcancel', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joyTouchId) { resetJoystick(); break; }
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joyTouchId) { resetJoystick(); break; }
+  }
+}, { passive: false });
+
+// Mouse fallback for desktop testing
+joystickBase.addEventListener('mousedown', e => { e.preventDefault(); joyActive = true; updateJoystick(e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => { if (joyActive) updateJoystick(e.clientX, e.clientY); });
+document.addEventListener('mouseup', () => { if (joyActive) resetJoystick(); });
 
 launchBtn.addEventListener('touchstart', e => { e.preventDefault(); launchBalls(); });
 launchBtn.addEventListener('click', () => launchBalls());
@@ -497,18 +543,16 @@ function update() {
   if (state !== 'playing') return;
   frameCount++;
 
-  // Input - keyboard uses speed-based, joystick uses direct position mapping
+  // Input - velocity-based like Galactic Defender
+  let inputX = 0;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) inputX = -1;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) inputX = 1;
+  // Joystick overrides keyboard when active
+  if (joyX !== 0) inputX = joyX;
+  paddle.x += inputX * paddle.speed;
   const halfW = paddle.w / 2;
-  const minX = halfW + 4, maxX = W - halfW - 4;
-  if (joyActive && Math.abs(joyX) > 0.02) {
-    // Direct position: joystick maps linearly to paddle position
-    const targetX = (W / 2) + joyX * (W / 2 - halfW - 4);
-    paddle.x += (targetX - paddle.x) * 0.35; // smooth lerp
-  }
-  if (keys['ArrowLeft'] || keys['a'] || keys['A']) paddle.x -= paddle.speed;
-  if (keys['ArrowRight'] || keys['d'] || keys['D']) paddle.x += paddle.speed;
-  if (paddle.x < minX) paddle.x = minX;
-  if (paddle.x > maxX) paddle.x = maxX;
+  if (paddle.x < halfW + 4) paddle.x = halfW + 4;
+  if (paddle.x > W - halfW - 4) paddle.x = W - halfW - 4;
 
   // Smooth paddle width change
   paddle.w += (paddle.targetW - paddle.w) * 0.15;
