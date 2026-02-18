@@ -11,14 +11,7 @@
     0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
     20%, 24%, 55% { opacity: 0.6; }
   }
-  @keyframes scanmove {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100vh); }
-  }
-  @keyframes pulse-glow {
-    0%, 100% { filter: brightness(1) drop-shadow(0 0 8px var(--glow)); }
-    50% { filter: brightness(1.2) drop-shadow(0 0 20px var(--glow)); }
-  }
+  /* scanmove and pulse-glow removed for performance */
   @keyframes float-up {
     0% { transform: translateY(60px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
@@ -39,17 +32,14 @@
     0%, 100% { transform: scale(1); text-shadow: 0 0 10px #ff0, 0 0 20px #fa0; }
     50% { transform: scale(1.05); text-shadow: 0 0 20px #ff0, 0 0 40px #fa0, 0 0 60px #f80; }
   }
-  @keyframes grid-scroll {
-    0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
-    100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
-  }
+  /* grid-scroll removed for performance */
   @keyframes star-twinkle {
     0%, 100% { opacity: 0.3; }
     50% { opacity: 1; }
   }
   @keyframes cabinet-hum {
-    0%, 100% { box-shadow: var(--cabinet-shadow), inset 0 0 60px rgba(0,0,0,0.8); }
-    50% { box-shadow: var(--cabinet-shadow-bright), inset 0 0 50px rgba(0,0,0,0.75); }
+    0%, 100% { opacity: 0.95; }
+    50% { opacity: 1; }
   }
   @keyframes screen-on {
     0% { transform: scaleY(0.005) scaleX(0); opacity: 0.5; }
@@ -103,7 +93,7 @@
       repeating-linear-gradient(90deg, rgba(0,255,238,0.04) 0px, transparent 1px, transparent 50px),
       repeating-linear-gradient(0deg, rgba(0,255,238,0.04) 0px, transparent 1px, transparent 50px);
     transform: perspective(500px) rotateX(60deg);
-    animation: grid-scroll 4s linear infinite;
+    /* grid-scroll animation removed for performance */
     z-index: 0; pointer-events: none;
     mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 70%);
     -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 70%);
@@ -120,25 +110,17 @@
       rgba(0,0,0,0.15) 4px
     );
   }
-  .scanlines::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(transparent 50%, rgba(0,0,0,0.08) 50%);
-    background-size: 100% 4px;
-    animation: scanmove 8s linear infinite;
-    opacity: 0.3;
-  }
+  /* removed animated scanline sweep for performance */
 
   /* ── Ambient light pools ── */
   .ambient {
     position: fixed; z-index: 0; pointer-events: none;
     border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.15;
+    opacity: 0.12;
   }
-  .ambient-1 { width: 600px; height: 600px; background: var(--neon-pink); top: -10%; left: -5%; }
-  .ambient-2 { width: 500px; height: 500px; background: var(--neon-cyan); bottom: -10%; right: -5%; }
-  .ambient-3 { width: 400px; height: 400px; background: #6622ff; top: 40%; left: 50%; transform: translateX(-50%); }
+  .ambient-1 { width: 600px; height: 600px; background: radial-gradient(circle, var(--neon-pink), transparent 70%); top: -10%; left: -5%; }
+  .ambient-2 { width: 500px; height: 500px; background: radial-gradient(circle, var(--neon-cyan), transparent 70%); bottom: -10%; right: -5%; }
+  .ambient-3 { width: 400px; height: 400px; background: radial-gradient(circle, #6622ff, transparent 70%); top: 40%; left: 50%; transform: translateX(-50%); }
 
   /* ── Main content ── */
   .arcade-wrapper {
@@ -267,7 +249,9 @@
     overflow: hidden;
     text-decoration: none; color: #fff;
     display: flex; flex-direction: column;
+    box-shadow: 0 0 30px rgba(255,34,102,0.15), 0 8px 32px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,0,0,0.8);
     animation: cabinet-hum 3s ease-in-out infinite, float-up 0.8s both;
+    will-change: transform, opacity;
     cursor: pointer;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s;
   }
@@ -295,7 +279,7 @@
     z-index: 10;
   }
   .cabinet:hover .screen-content {
-    animation: pulse-glow 1.5s ease-in-out infinite;
+    box-shadow: 0 0 20px var(--glow);
   }
   .cabinet:hover .play-prompt {
     opacity: 1;
@@ -898,9 +882,9 @@
 </div>
 
 <script>
-// Generate starfield
+// Generate starfield (reduced count for performance)
 const sf = document.getElementById('starfield');
-for (let i = 0; i < 80; i++) {
+for (let i = 0; i < 30; i++) {
   const s = document.createElement('div');
   s.className = 'star';
   s.style.cssText = `
@@ -915,11 +899,17 @@ for (let i = 0; i < 80; i++) {
   sf.appendChild(s);
 }
 
-// Subtle parallax on mouse move
+// Throttled parallax on mouse move
+let ticking = false;
 document.addEventListener('mousemove', (e) => {
-  const x = (e.clientX / window.innerWidth - 0.5) * 10;
-  const y = (e.clientY / window.innerHeight - 0.5) * 10;
-  sf.style.transform = `translate(${x}px, ${y}px)`;
+  if (ticking) return;
+  ticking = true;
+  requestAnimationFrame(() => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 10;
+    const y = (e.clientY / window.innerHeight - 0.5) * 10;
+    sf.style.transform = `translate(${x}px, ${y}px)`;
+    ticking = false;
+  });
 });
 </script>
 
