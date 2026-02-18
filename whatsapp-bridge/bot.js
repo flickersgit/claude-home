@@ -2,20 +2,25 @@
 
 require('dotenv').config();
 
+const fs = require('fs');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const http = require('http');
 const { exec } = require('child_process');
+const path = require('path');
 
 const { getState, setState, clearPendingPlan, isPlanExpired } = require('./state');
 const mochi = require('./mochi');
-const { generatePlan, executePlan } = require('./claude');
+const { generatePlan, executePlan, compactSession, COMPACTION_THRESHOLD } = require('./claude');
+const heartbeat = require('./heartbeat');
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 const OWNER_NUMBER = process.env.OWNER_NUMBER;
-const PLAN_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const PLAN_EXPIRY_MS = 10 * 60 * 1000;   // 10 minutes
+const EXECUTION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const MEMORY_FILE = path.join(__dirname, 'MEMORY.md');
 
 if (!OWNER_NUMBER) {
   console.error('[boot] OWNER_NUMBER is not set in .env — Mochi cannot start.');
@@ -48,7 +53,6 @@ const client = new Client({
 // ---------------------------------------------------------------------------
 // Auth / lifecycle events
 // ---------------------------------------------------------------------------
-// Serve QR code in browser for easy scanning
 let qrServer = null;
 client.on('qr', async (qr) => {
   console.log('[auth] QR code ready — opening in browser...');
@@ -67,7 +71,6 @@ img{border:12px solid #fff;border-radius:12px;}p{margin-top:20px;opacity:.6;font
       exec('open http://localhost:3131');
     });
   } else {
-    // Update the served HTML for the new QR (refresh page to see it)
     qrServer.removeAllListeners('request');
     qrServer.on('request', (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -88,6 +91,7 @@ client.on('auth_failure', (msg) => {
 client.on('ready', async () => {
   console.log('[wa]  Mochi is ready!');
   await handleReconnect();
+  heartbeat.start(client, OWNER_NUMBER, getState);
 });
 
 let reconnectTimer = null;
@@ -96,17 +100,14 @@ client.on('disconnected', async (reason) => {
 
   if (reason === 'LOGOUT') {
     console.error('[wa]  Phone unlinked the device — manual QR re-scan required.');
-    // Write sentinel file so pm2/operator knows
-    require('fs').writeFileSync('./NEEDS_RESCAN', new Date().toISOString());
+    fs.writeFileSync('./NEEDS_RESCAN', new Date().toISOString());
     return;
   }
 
   clearTimeout(reconnectTimer);
   reconnectTimer = setTimeout(async () => {
     console.log('[wa]  Reconnecting...');
-    try {
-      await client.destroy();
-    } catch {}
+    try { await client.destroy(); } catch {}
     client.initialize();
   }, 5_000);
 });
@@ -124,7 +125,6 @@ async function handleReconnect() {
       console.log(`[reconnect] ${unread} unread message(s) from owner`);
       await client.sendMessage(OWNER_NUMBER, mochi.napComeBack());
 
-      // Fetch recent messages and process the latest one
       const messages = await chat.fetchMessages({ limit: unread + 1 });
       const unreadMessages = messages.filter(m => !m.fromMe).slice(-unread);
       const latest = unreadMessages[unreadMessages.length - 1];
@@ -142,8 +142,12 @@ async function handleReconnect() {
 // Message handler
 // ---------------------------------------------------------------------------
 client.on('message', async (msg) => {
+  console.log(`[msg] from=${msg.from} fromMe=${msg.fromMe} type=${msg.type} body=${(msg.body||'').slice(0,50)}`);
   if (msg.fromMe) return;
-  if (msg.from !== OWNER_NUMBER) return; // silently drop unknown senders
+  if (msg.from !== OWNER_NUMBER) {
+    console.log(`[msg] dropped — expected ${OWNER_NUMBER}`);
+    return;
+  }
 
   await handleMessage(msg, false);
 });
@@ -162,6 +166,63 @@ async function handleMessage(msg, fromReconnect) {
 
   const state = getState(chatId);
 
+  // Memory queries — handle before everything else
+  if (mochi.isMemoryQuery(text)) {
+    try {
+      const contents = fs.readFileSync(MEMORY_FILE, 'utf8');
+      await client.sendMessage(chatId, mochi.memoryReport(contents));
+    } catch {
+      await client.sendMessage(chatId, mochi.memoryReport(''));
+    }
+    return;
+  }
+
+  // Forget query — ask for confirmation first
+  if (mochi.isForgetQuery(text)) {
+    if (state.status === 'awaiting_forget_confirm') {
+      // They already got the prompt and are confirming
+      if (mochi.isConfirmation(text)) {
+        try {
+          fs.writeFileSync(MEMORY_FILE, '# Mochi Memory\n');
+        } catch (err) {
+          console.error('[memory] Failed to clear MEMORY.md:', err.message);
+        }
+        setState(chatId, { status: 'idle' });
+        await client.sendMessage(chatId, mochi.memoryCleared());
+      } else {
+        setState(chatId, { status: 'idle' });
+        await client.sendMessage(chatId, 'OK, keeping the memory! 👍');
+      }
+    } else {
+      setState(chatId, { status: 'awaiting_forget_confirm' });
+      await client.sendMessage(chatId, '🗑️ Clear all my memory? This cannot be undone. (yes / no)');
+    }
+    return;
+  }
+
+  // Handle forget confirmation replies
+  if (state.status === 'awaiting_forget_confirm') {
+    if (mochi.isConfirmation(text)) {
+      try {
+        fs.writeFileSync(MEMORY_FILE, '# Mochi Memory\n');
+      } catch (err) {
+        console.error('[memory] Failed to clear MEMORY.md:', err.message);
+      }
+      setState(chatId, { status: 'idle' });
+      await client.sendMessage(chatId, mochi.memoryCleared());
+    } else {
+      setState(chatId, { status: 'idle' });
+      await client.sendMessage(chatId, 'OK, keeping the memory! 👍');
+    }
+    return;
+  }
+
+  // Casual greeting — respond with a fun reply, no planning
+  if (mochi.isGreeting(text)) {
+    await client.sendMessage(chatId, mochi.casualGreeting());
+    return;
+  }
+
   // Status query
   if (mochi.isStatusQuery(text)) {
     await client.sendMessage(chatId, mochi.statusReport(state));
@@ -177,12 +238,10 @@ async function handleMessage(msg, fromReconnect) {
   // Awaiting "abandon old plan?" confirmation
   if (state.status === 'awaiting_abandon_confirm') {
     if (mochi.isConfirmation(text)) {
-      // Abandon old, start new
       const newInstruction = state.pendingNewInstruction;
       clearPendingPlan(chatId);
       await processInstruction(chatId, newInstruction);
     } else if (mochi.isRejection(text)) {
-      // Keep old plan
       setState(chatId, {
         status: 'awaiting_confirm',
         pendingNewInstruction: null,
@@ -196,11 +255,9 @@ async function handleMessage(msg, fromReconnect) {
 
   // Awaiting confirmation of a plan
   if (state.status === 'awaiting_confirm') {
-    // Check expiry first
     if (isPlanExpired(state)) {
       clearPendingPlan(chatId);
       await client.sendMessage(chatId, mochi.planExpired());
-      // Fall through to process as new instruction if text looks like one
       if (!mochi.isConfirmation(text) && !mochi.isRejection(text)) {
         await processInstruction(chatId, text);
       }
@@ -232,7 +289,7 @@ async function handleMessage(msg, fromReconnect) {
 }
 
 // ---------------------------------------------------------------------------
-// Process a new instruction: greet (if needed) → plan → send for confirmation
+// Process a new instruction: greet (if needed) → compact (if needed) → plan
 // ---------------------------------------------------------------------------
 async function processInstruction(chatId, instruction) {
   const state = getState(chatId);
@@ -246,10 +303,23 @@ async function processInstruction(chatId, instruction) {
   // Acknowledge
   await client.sendMessage(chatId, mochi.thinking());
 
+  // Compaction check — run before generating a new plan
+  const currentCount = state.interactionCount || 0;
+  if (currentCount > 0 && currentCount % COMPACTION_THRESHOLD === 0 && state.claudeSessionId) {
+    await client.sendMessage(chatId, mochi.compacting());
+    await compactSession(state.claudeSessionId);
+    setState(chatId, { claudeSessionId: null }); // fresh session after compaction
+  }
+
+  // Increment interaction count
+  const newCount = currentCount + 1;
+  setState(chatId, { interactionCount: newCount });
+
   // Generate plan (read-only)
   let plan, newSessionId;
   try {
-    const result = await generatePlan(instruction, state.claudeSessionId);
+    const freshState = getState(chatId);
+    const result = await generatePlan(instruction, freshState.claudeSessionId);
     plan = result.plan;
     newSessionId = result.sessionId;
   } catch (err) {
@@ -271,21 +341,37 @@ async function processInstruction(chatId, instruction) {
 }
 
 // ---------------------------------------------------------------------------
-// Execute a confirmed plan
+// Execute a confirmed plan — with 15-minute timeout
 // ---------------------------------------------------------------------------
 async function doExecute(chatId, state) {
   setState(chatId, { status: 'executing' });
   await client.sendMessage(chatId, mochi.confirmExecuting());
 
   let execResult;
+  let timedOut = false;
+
+  const timeoutHandle = setTimeout(async () => {
+    timedOut = true;
+    clearPendingPlan(chatId);
+    console.error('[claude] executePlan timed out after 15 minutes');
+    try {
+      await client.sendMessage(chatId, mochi.executionTimeout());
+    } catch {}
+  }, EXECUTION_TIMEOUT_MS);
+
   try {
     execResult = await executePlan(state.pendingInstruction, state.claudeSessionId);
   } catch (err) {
+    clearTimeout(timeoutHandle);
+    if (timedOut) return;
     console.error('[claude] executePlan error:', err);
     clearPendingPlan(chatId);
     await client.sendMessage(chatId, mochi.errorReport(err.message));
     return;
   }
+
+  clearTimeout(timeoutHandle);
+  if (timedOut) return;
 
   // Update session ID, clear pending plan
   setState(chatId, {
@@ -311,6 +397,9 @@ async function doExecute(chatId, state) {
   }
 
   await client.sendMessage(chatId, reply);
+
+  // Deliver any queued heartbeat alerts after execution completes
+  heartbeat.flushQueue(client, OWNER_NUMBER);
 }
 
 // ---------------------------------------------------------------------------

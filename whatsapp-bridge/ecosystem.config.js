@@ -10,6 +10,10 @@ module.exports = {
     restart_delay: 5000,
     max_memory_restart: '600M',
     env_file: './.env',
+    env: {
+      PATH: '/Users/statpods/.local/bin:/usr/local/bin:/usr/bin:/bin',
+      CLAUDECODE: '',
+    },
     out_file: './logs/out.log',
     error_file: './logs/err.log',
     log_date_format: 'YYYY-MM-DD HH:mm:ss',

@@ -17,6 +17,9 @@ setup/textastic_rsa
 # Node
 node_modules/
 
+# Wrangler
+.wrangler/
+
 # Generated files
 *.mp4
 concat_list.txt

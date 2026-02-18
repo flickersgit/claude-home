@@ -25,8 +25,24 @@ const STATUS_WORDS = new Set([
   '?', 'status', 'state',
   'what are you doing', 'what are you working on',
   'busy', 'busy?', 'are you busy',
-  'hello', 'hi', 'hey',
 ]);
+
+const GREETING_WORDS = new Set([
+  'hello', 'hi', 'hey', 'hiya',
+  'yo', 'sup', 'wassup', 'what\'s up', 'whats up',
+  'howdy', 'heya', 'morning', 'afternoon', 'evening',
+  'yo!', 'hey!', 'hi!', 'hello!',
+]);
+
+const MEMORY_QUERY_PHRASES = [
+  'what do you remember', 'show your memory', 'show memory',
+  'what do you know', 'your memory', 'memory',
+];
+
+const FORGET_PHRASES = [
+  'forget everything', 'clear memory', 'clear your memory',
+  'wipe memory', 'reset memory',
+];
 
 function isConfirmation(text) {
   const t = text.trim().toLowerCase();
@@ -44,6 +60,21 @@ function isRejection(text) {
 function isStatusQuery(text) {
   const t = text.trim().toLowerCase();
   return STATUS_WORDS.has(t);
+}
+
+function isGreeting(text) {
+  const t = text.trim().toLowerCase();
+  return GREETING_WORDS.has(t);
+}
+
+function isMemoryQuery(text) {
+  const t = text.trim().toLowerCase();
+  return MEMORY_QUERY_PHRASES.some(p => t === p || t.startsWith(p));
+}
+
+function isForgetQuery(text) {
+  const t = text.trim().toLowerCase();
+  return FORGET_PHRASES.some(p => t === p || t.startsWith(p));
 }
 
 // Returns today's date as YYYY-MM-DD in the local timezone
@@ -64,6 +95,19 @@ function greeting() {
   const hour = new Date().getHours();
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   return `Good ${timeOfDay}! ☕ I'm Mochi — your game arcade assistant. What are we building today?`;
+}
+
+const CASUAL_GREETINGS = [
+  "Hey hey! 👋 Ready to build something fun?",
+  "Yo! 🎮 What are we making today?",
+  "Heyyy! Mochi's here and caffeinated ☕ What's the mission?",
+  "Oh hi! 👾 Got a game idea brewing?",
+  "Sup! 🕹️ Tell me what to build!",
+  "Hiya! Ready when you are — what's on the agenda?",
+];
+
+function casualGreeting() {
+  return CASUAL_GREETINGS[Math.floor(Math.random() * CASUAL_GREETINGS.length)];
 }
 
 function thinking() {
@@ -138,10 +182,39 @@ function errorReport(error) {
   return `❌ Something went wrong:\n${error}`;
 }
 
+function memoryReport(contents) {
+  if (!contents || !contents.trim()) return "🧠 My memory is empty — I haven't stored anything yet.";
+  return `🧠 Here's what I remember:\n\n${contents.trim()}`;
+}
+
+function memoryCleared() {
+  return '🗑️ Memory cleared! Starting fresh.';
+}
+
+function sessionReset() {
+  return '🔄 Lost conversation context after restart — starting a fresh session.';
+}
+
+function compacting() {
+  return '📝 Archiving context before we continue...';
+}
+
+function heartbeatAlert(checkName, message) {
+  return `⚠️ Heartbeat: ${checkName}\n${message}\n\nTo investigate, just tell me what to check.`;
+}
+
+function executionTimeout() {
+  return '⏱️ Execution timed out after 15 minutes. The task may have partially completed — check the project directory.';
+}
+
 module.exports = {
   isConfirmation,
   isRejection,
   isStatusQuery,
+  isGreeting,
+  isMemoryQuery,
+  isForgetQuery,
+  casualGreeting,
   shouldGreet,
   todayString,
   greeting,
@@ -158,4 +231,10 @@ module.exports = {
   statusReport,
   abandonPrompt,
   errorReport,
+  memoryReport,
+  memoryCleared,
+  sessionReset,
+  compacting,
+  heartbeatAlert,
+  executionTimeout,
 };

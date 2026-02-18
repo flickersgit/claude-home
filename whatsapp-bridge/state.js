@@ -8,15 +8,12 @@ const STATE_FILE = path.join(__dirname, 'sessions.json');
 // In-memory store: chatId → state object
 const store = new Map();
 
-// Load persisted state on startup (but clear claudeSessionId — doesn't survive restarts)
+// Load persisted state on startup — claudeSessionId IS restored (Phase 3)
 function loadFromDisk() {
   try {
     const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     for (const [chatId, s] of Object.entries(raw)) {
-      store.set(chatId, {
-        ...s,
-        claudeSessionId: null, // never restore — SDK sessions don't survive restarts
-      });
+      store.set(chatId, { ...defaultState(), ...s });
     }
     console.log(`[state] Loaded ${store.size} session(s) from disk`);
   } catch {
@@ -39,8 +36,9 @@ function defaultState() {
     pendingInstruction: null,        // original user instruction
     pendingNewInstruction: null,     // new instruction received while awaiting_confirm
     expiresAt: null,                 // Date.now() + 10 min — null when not awaiting
-    claudeSessionId: null,           // SDK session ID — cleared on restart
+    claudeSessionId: null,           // SDK session ID — now persists across restarts
     lastGreetedDate: null,           // 'YYYY-MM-DD'
+    interactionCount: 0,             // incremented on each generatePlan; triggers compaction at threshold
   };
 }
 
