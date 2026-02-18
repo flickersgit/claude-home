@@ -5,27 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>OBBY - Obstacle Course</title>
 <style>
+  :root {
+    --arcade-hud-offset: 40px;
+    --viewport-h: 100vh;
+    --hud-safe-top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px));
+  }
+  @supports (height: 100dvh) {
+    :root { --viewport-h: 100dvh; }
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #0a0a1a;
     display: flex;
     justify-content: center;
-    align-items: center;
-    height: 100vh;
+    align-items: flex-start;
+    width: 100vw;
+    min-height: var(--viewport-h);
+    height: var(--viewport-h);
+    padding: var(--hud-safe-top) 10px env(safe-area-inset-bottom, 0px);
     overflow: hidden;
     font-family: 'Segoe UI', sans-serif;
-  }
-  @supports (height: 100dvh) {
-    body { height: 100dvh; }
+    position: relative;
   }
   canvas {
     border: 2px solid #333;
     border-radius: 8px;
     image-rendering: pixelated;
     touch-action: none;
+    max-width: calc(100vw - 20px);
+    height: auto;
+    margin: 0 auto;
   }
   .home-btn {
-    position: fixed; top: 12px; right: 12px; z-index: 999;
+    position: fixed; top: calc(var(--hud-safe-top) + 12px); right: 12px; z-index: 999;
     width: 50px; height: 50px; border-radius: 50%;
     background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4);
     color: #fff; cursor: pointer;
@@ -111,8 +123,8 @@
     #controls { display: none; }
   }
   #ui {
-    position: absolute;
-    top: 20px;
+    position: fixed;
+    top: calc(var(--hud-safe-top) + 20px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -125,10 +137,15 @@
   }
   #ui span { opacity: 0.9; }
   #menu {
-    position: absolute;
+    position: fixed;
+    top: var(--hud-safe-top);
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 20px;
     z-index: 20;
   }
@@ -170,7 +187,6 @@
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade">BACK</a>
 
 <div id="menu">
   <h1>OBBY</h1>
@@ -218,11 +234,21 @@ let cameraX = 0, cameraY = 0;
 
 // --- Responsive Canvas ---
 function resizeCanvas() {
-  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
-  canvas.style.width = (W * scale) + 'px';
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const viewportH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const rootStyles = getComputedStyle(document.documentElement);
+  const hudOffset = parseFloat(rootStyles.getPropertyValue('--arcade-hud-offset')) || 40;
+  const safeInsetTop = window.visualViewport
+    ? Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop)
+    : 0;
+  const availW = Math.max(220, window.innerWidth - 20);
+  const availH = Math.max(220, viewportH - hudOffset - safeInsetTop - (isMobile ? 190 : 0) - 8);
+  const scale = Math.min(availW / W, availH / H, isMobile ? 1 : 1.15);
+  canvas.style.width = Math.min(W * scale, availW) + 'px';
   canvas.style.height = (H * scale) + 'px';
 }
 window.addEventListener('resize', resizeCanvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // --- Input ---
@@ -1021,6 +1047,7 @@ function updatePlayer() {
     }
     if (p.type === 'finish' && collides(player, p)) {
       gameState = 'win';
+      if (window.ArcadeProfile) ArcadeProfile.submitScore('obby', deaths);
     }
   }
 
@@ -1333,5 +1360,8 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
 requestAnimationFrame(loop);
 </script>
+<script src="../avatars.js?v=1771409778"></script>
+<script src="../arcade-profile.js?v=1771409778"></script>
+<script>if(window.ArcadeProfile)ArcadeProfile.renderHUD({accentColor:'#f64'});</script>
 </body>
 </html>

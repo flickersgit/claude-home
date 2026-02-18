@@ -5,29 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>NEON BREAKER</title>
 <style>
+  :root {
+    --arcade-hud-offset: 40px;
+    --viewport-h: 100vh;
+  }
+  @supports (height: 100dvh) {
+    :root { --viewport-h: 100dvh; }
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #000;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100dvh;
-    height: 100vh; /* fallback for older browsers */
+    width: 100vw;
+    min-height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+    height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+    padding: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 0px);
     font-family: 'Courier New', monospace;
     overflow: hidden;
-  }
-  @supports (height: 100dvh) {
-    body { height: 100dvh; }
   }
   #gameContainer {
     position: relative;
     border: 2px solid #cc44ff;
     box-shadow: 0 0 30px rgba(204,68,255,0.3), inset 0 0 30px rgba(204,68,255,0.05);
     image-rendering: pixelated;
+    max-width: calc(100vw - 20px);
+    margin: 0 auto;
   }
-  canvas { display: block; touch-action: none; }
+  canvas { display: block; touch-action: none; max-width: 100%; height: auto; margin: 0 auto; }
   .home-btn {
-    position: fixed; top: 12px; right: 12px; z-index: 999;
+    position: fixed; top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px) + 12px); right: 12px; z-index: 999;
     padding: 8px 16px; border-radius: 0;
     background: transparent; border: 2px solid #cc44ff;
     color: #cc44ff; cursor: pointer;
@@ -103,15 +111,15 @@
   @media (pointer: coarse) {
     body {
       flex-direction: column;
-      padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+      padding: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 0px);
     }
     #hud { padding-right: 80px; }
     #gameContainer {
       flex-shrink: 1; min-height: 0;
-      max-height: calc(100dvh - 130px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(var(--viewport-h) - 130px - var(--arcade-hud-offset));
     }
     canvas {
-      max-height: calc(100dvh - 130px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(var(--viewport-h) - 130px - var(--arcade-hud-offset));
       width: auto;
     }
     #touchControls {
@@ -161,7 +169,6 @@
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade">EXIT</a>
 
 <div id="gameContainer">
   <canvas id="gameCanvas"></canvas>
@@ -194,6 +201,19 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = 480, H = 720;
 canvas.width = W; canvas.height = H;
+
+function resizeCanvas() {
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const viewportH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const availW = Math.max(220, window.innerWidth - 20);
+  const availH = Math.max(220, viewportH - 40 - (isMobile ? 145 : 8));
+  const scale = Math.min(availW / W, availH / H, isMobile ? 1 : 1.2);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvas);
 
 const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('startBtn');
@@ -524,6 +544,16 @@ function showOverlay(title, finalScore) {
     html += '<div class="score-display">SCORE: ' + finalScore + '</div>';
     html += '<div class="highscore">BEST: ' + highScore + '</div>';
     html += '<div class="info" style="margin-top:6px">LEVEL REACHED: ' + level + '</div>';
+    if (window.ArcadeProfile) {
+      ArcadeProfile.submitScore('retro-paddle', finalScore).then(r => {
+        if (r) {
+          const el = document.createElement('div');
+          el.style.cssText = 'font-size:10px;color:#cc44ff;margin-top:6px;';
+          el.textContent = r.isNewBest ? 'NEW BEST! RANK: #' + r.globalRank : 'RANK: #' + r.globalRank;
+          overlay.querySelector('.overlay-content').appendChild(el);
+        }
+      });
+    }
   } else {
     html += '<h2>★ BRICK SMASHER ★</h2>';
   }
@@ -980,5 +1010,8 @@ startBtn.addEventListener('click', () => {
 
 requestAnimationFrame(gameLoop);
 </script>
+<script src="../avatars.js?v=1771409778"></script>
+<script src="../arcade-profile.js?v=1771409778"></script>
+<script>if(window.ArcadeProfile)ArcadeProfile.renderHUD({accentColor:'#c4f'});</script>
 </body>
 </html>

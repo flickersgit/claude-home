@@ -1,0 +1,8 @@
+name = "game-arcade"
+pages_build_output_dir = "."
+compatibility_date = "2026-02-18"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "arcade-db"
+database_id = "e06a1369-338b-4eb1-b44c-d9f7d48c15e2"

@@ -51,6 +51,11 @@
     --neon-cyan: #00ffee;
     --neon-yellow: #ffe033;
     --arcade-purple: #1a0a2e;
+    --arcade-hud-offset: 40px;
+    --viewport-h: 100vh;
+  }
+  @supports (height: 100dvh) {
+    :root { --viewport-h: 100dvh; }
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,7 +66,8 @@
     background: var(--bg-deep);
     color: #fff;
     font-family: 'Silkscreen', 'Press Start 2P', monospace;
-    min-height: 100vh;
+    min-height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+    padding-top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px));
     overflow-x: hidden;
     cursor: crosshair;
   }
@@ -123,12 +129,12 @@
     position: relative; z-index: 1;
     display: flex; flex-direction: column; align-items: center;
     padding: 40px 20px 80px;
-    min-height: 100vh;
+    min-height: calc(var(--viewport-h) - var(--arcade-hud-offset));
   }
 
   /* ── Top marquee bar ── */
   .marquee-bar {
-    width: 100%; max-width: 960px;
+    width: 100%; max-width: 1200px;
     border: 1px solid rgba(255,34,102,0.3);
     border-bottom: none;
     background: linear-gradient(180deg, rgba(255,34,102,0.08), transparent);
@@ -148,7 +154,7 @@
 
   /* ── Header ── */
   .header {
-    width: 100%; max-width: 960px;
+    width: 100%; max-width: 1200px;
     text-align: center;
     padding: 50px 20px 40px;
     background: linear-gradient(180deg, rgba(26,10,46,0.6), transparent);
@@ -213,7 +219,7 @@
   .boot-area {
     padding: 12px 20px 20px;
     display: flex; flex-direction: column; gap: 4px;
-    max-width: 960px; width: 100%;
+    max-width: 1200px; width: 100%;
     border-left: 1px solid rgba(0,255,0,0.08);
     border-right: 1px solid rgba(0,255,0,0.08);
     background: linear-gradient(180deg, transparent, rgba(0,255,0,0.01));
@@ -222,14 +228,14 @@
   /* ── Game cabinet cards ── */
   .cabinets {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    max-width: 960px; width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 26px;
+    max-width: 1200px; width: 100%;
     padding: 0 0 40px;
   }
 
   @media (max-width: 700px) {
-    .cabinets { grid-template-columns: 1fr; max-width: 420px; }
+    .cabinets { grid-template-columns: 1fr; max-width: 480px; gap: 18px; }
   }
 
   .cabinet {
@@ -642,7 +648,7 @@
 
   /* ── Bottom bar ── */
   .bottom-bar {
-    max-width: 960px; width: 100%;
+    max-width: 1200px; width: 100%;
     padding: 16px 20px;
     border-top: 1px solid rgba(255,255,255,0.04);
     display: flex;
@@ -665,6 +671,157 @@
   .cabinet:nth-child(4) .screen-content { animation: screen-on 0.6s 1.1s both; }
   .cabinet:nth-child(5) .screen-content { animation: screen-on 0.6s 1.3s both; }
 
+  /* ── Auth widget ── */
+  .auth-widget {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .auth-widget .avatar-display {
+    image-rendering: pixelated; flex-shrink: 0;
+  }
+  .auth-widget .user-name {
+    color: var(--neon-yellow); font-family: 'Press Start 2P', monospace;
+    font-size: 8px; letter-spacing: 1px;
+  }
+  .auth-btn {
+    font-family: 'Press Start 2P', monospace; font-size: 10px;
+    color: var(--neon-cyan); background: rgba(0,255,238,0.06); border: 2px solid rgba(0,255,238,0.5);
+    padding: 8px 16px; cursor: pointer; letter-spacing: 1px;
+    transition: all 0.2s; text-shadow: 0 0 6px rgba(0,255,238,0.4);
+  }
+  .auth-btn:hover { background: rgba(0,255,238,0.15); border-color: var(--neon-cyan); box-shadow: 0 0 12px rgba(0,255,238,0.3); }
+  .auth-btn.logout { color: #f44; border-color: rgba(255,68,68,0.5); background: rgba(255,68,68,0.06); text-shadow: 0 0 6px rgba(255,68,68,0.4); }
+  .auth-btn.logout:hover { background: rgba(255,68,68,0.15); box-shadow: 0 0 12px rgba(255,68,68,0.3); }
+
+  /* ── Auth Modal ── */
+  .auth-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+  }
+  .auth-modal-overlay.active { display: flex; }
+  .auth-modal {
+    background: #0a0a18; border: 2px solid var(--neon-cyan); border-radius: 12px;
+    padding: 28px 24px; max-width: 400px; width: 90%;
+    box-shadow: 0 0 40px rgba(0,255,238,0.2), inset 0 0 40px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .auth-modal h2 {
+    font-family: 'Press Start 2P', monospace; font-size: 16px;
+    color: var(--neon-cyan); text-align: center; margin-bottom: 20px;
+    text-shadow: 0 0 10px rgba(0,255,238,0.5);
+  }
+  .auth-modal .close-btn {
+    position: absolute; top: 10px; right: 14px; background: none; border: none;
+    color: #666; font-size: 18px; cursor: pointer; font-family: monospace;
+  }
+  .auth-modal .close-btn:hover { color: #f44; }
+  .auth-modal label {
+    font-family: 'Press Start 2P', monospace; font-size: 8px; color: #aaa;
+    display: block; margin-bottom: 4px; letter-spacing: 1px;
+  }
+  .auth-modal input[type="text"], .auth-modal input[type="password"] {
+    width: 100%; padding: 10px; margin-bottom: 12px;
+    background: #111; border: 1px solid #333; border-radius: 4px;
+    color: #fff; font-family: 'Silkscreen', monospace; font-size: 14px;
+    outline: none; box-sizing: border-box;
+  }
+  .auth-modal input:focus { border-color: var(--neon-cyan); }
+  .auth-modal .password-warning {
+    background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3);
+    border-radius: 4px; padding: 8px; margin-bottom: 12px;
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: #f44; text-align: center; line-height: 1.6;
+    animation: flicker 2s infinite;
+  }
+  .auth-modal .submit-btn {
+    width: 100%; padding: 12px; font-family: 'Press Start 2P', monospace;
+    font-size: 12px; color: #000; background: var(--neon-cyan); border: none;
+    border-radius: 4px; cursor: pointer; letter-spacing: 2px;
+    transition: all 0.2s;
+  }
+  .auth-modal .submit-btn:hover { background: #fff; }
+  .auth-modal .switch-mode {
+    text-align: center; margin-top: 14px;
+    font-family: 'Press Start 2P', monospace; font-size: 7px; color: #666;
+  }
+  .auth-modal .switch-mode a {
+    color: var(--neon-yellow); cursor: pointer; text-decoration: none;
+  }
+  .auth-modal .auth-error {
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: #f44; text-align: center; margin-bottom: 10px;
+    min-height: 14px;
+  }
+  /* Avatar picker */
+  .avatar-picker {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+    margin-bottom: 12px; justify-items: center;
+  }
+  .avatar-picker .av-option {
+    width: 36px; height: 36px; border: 2px solid #333; border-radius: 4px;
+    cursor: pointer; background: #111; padding: 2px; display: flex;
+    align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .avatar-picker .av-option:hover { border-color: #888; }
+  .avatar-picker .av-option.selected { border-color: var(--neon-cyan); box-shadow: 0 0 8px rgba(0,255,238,0.4); }
+  .avatar-picker .av-option canvas { image-rendering: pixelated; }
+  .avatar-random-btn {
+    display: block; margin: 0 auto 12px; padding: 6px 16px;
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: var(--neon-yellow); background: none; border: 1px solid rgba(255,224,51,0.3);
+    cursor: pointer; letter-spacing: 1px;
+  }
+  .avatar-random-btn:hover { background: rgba(255,224,51,0.1); }
+
+  /* ── Leaderboard ── */
+  .leaderboard-section {
+    max-width: 1200px; width: 100%; margin-top: 0; margin-bottom: 20px;
+  }
+  .lb-title {
+    font-family: 'Press Start 2P', monospace; font-size: 14px;
+    color: var(--neon-yellow); text-align: center; margin-bottom: 16px;
+    text-shadow: 0 0 10px rgba(255,224,51,0.4);
+    letter-spacing: 4px;
+  }
+  .lb-tabs {
+    display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 16px;
+  }
+  .lb-tab {
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: #666; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    padding: 6px 10px; cursor: pointer; border-radius: 3px; letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .lb-tab:hover { color: #aaa; border-color: rgba(255,255,255,0.2); }
+  .lb-tab.active { color: var(--neon-cyan); border-color: var(--neon-cyan); background: rgba(0,255,238,0.05); }
+  .lb-table {
+    width: 100%; border-collapse: collapse;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px; overflow: hidden;
+  }
+  .lb-table th {
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: #888; padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.06); letter-spacing: 1px;
+  }
+  .lb-table td {
+    font-family: 'Silkscreen', monospace; font-size: 12px;
+    color: #ccc; padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .lb-table tr:last-child td { border-bottom: none; }
+  .lb-table .rank { color: var(--neon-yellow); font-family: 'Press Start 2P', monospace; font-size: 9px; width: 40px; }
+  .lb-table .rank-1 { color: #fc0; text-shadow: 0 0 6px rgba(255,204,0,0.5); }
+  .lb-table .rank-2 { color: #ccc; }
+  .lb-table .rank-3 { color: #c84; }
+  .lb-table .player-cell { display: flex; align-items: center; gap: 8px; }
+  .lb-table .player-cell canvas { image-rendering: pixelated; flex-shrink: 0; }
+  .lb-table .score-val { color: var(--neon-cyan); font-family: 'Press Start 2P', monospace; font-size: 9px; text-align: right; }
+  .lb-empty {
+    text-align: center; padding: 24px; color: #444;
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    letter-spacing: 2px;
+  }
+
   /* ── Responsive tweaks ── */
   @media (max-width: 500px) {
     .arcade-wrapper { padding: 20px 12px 60px; }
@@ -672,6 +829,8 @@
     .cabinet-info { padding: 14px 14px 12px; }
     .header { padding: 30px 16px 28px; }
     .title { letter-spacing: 4px; }
+    .avatar-picker { grid-template-columns: repeat(4, 1fr); }
+    .lb-table td, .lb-table th { padding: 6px 8px; }
   }
 </style>
 </head>
@@ -690,7 +849,7 @@
   <!-- Marquee ticker -->
   <div class="marquee-bar">
     <div class="marquee-text">
-      ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ NEON BREAKER ★ 5 GAMES READY TO PLAY ★ HIGH SCORES WELCOME ★ RETRO SHOOTOUT ★ GALACTIC DEFENDER ★ OBBY ★ VOID RUNNER ★ NEON BREAKER ★
+      <span id="marqueeContent"></span>
     </div>
   </div>
 
@@ -700,13 +859,13 @@
       GAME<br>ARCADE
       <span>SELECT YOUR GAME</span>
     </h1>
-    <div class="insert-coin">INSERT COIN</div>
+    <div class="insert-coin" id="insertCoin" style="cursor:pointer;">INSERT COIN</div>
   </div>
 
   <!-- Boot text -->
   <div class="boot-area">
     <div class="boot-line">SYSTEM BOOT... OK</div>
-    <div class="boot-line">LOADING 4 CABINETS... READY</div>
+    <div class="boot-line" id="bootCabinets"></div>
     <div class="boot-line">> SELECT GAME _</div>
   </div>
 
@@ -869,15 +1028,59 @@
 
   </div>
 
+  <!-- Leaderboard -->
+  <div class="leaderboard-section">
+    <div class="lb-title">TOP SCORES</div>
+    <div class="lb-tabs" id="lbTabs"></div>
+    <div id="lbContent"><div class="lb-empty">LOADING SCORES...</div></div>
+  </div>
+
   <!-- Bottom bar -->
   <div class="bottom-bar">
-    <span>5 GAMES LOADED</span>
-    <span class="credits">CREDITS: 99</span>
+    <span class="game-count"></span>
+    <div class="auth-widget" id="authWidget"></div>
   </div>
 
 </div>
 
+<!-- Auth Modal -->
+<div class="auth-modal-overlay" id="authModal">
+  <div class="auth-modal">
+    <button class="close-btn" id="authClose">&times;</button>
+    <h2 id="authTitle">LOGIN</h2>
+    <div class="auth-error" id="authError"></div>
+    <div id="avatarSection" style="display:none">
+      <label>CHOOSE AVATAR</label>
+      <div class="avatar-picker" id="avatarPicker"></div>
+      <button class="avatar-random-btn" id="avatarRandom">RANDOM</button>
+    </div>
+    <label>USERNAME</label>
+    <input type="text" id="authUser" maxlength="16" autocomplete="username" spellcheck="false">
+    <label>PASSWORD</label>
+    <input type="password" id="authPass" maxlength="64" autocomplete="current-password">
+    <div class="password-warning" id="passWarning" style="display:none">
+      WARNING: REMEMBER YOUR PASSWORD!<br>THERE IS NO WAY TO RECOVER IT.
+    </div>
+    <button class="submit-btn" id="authSubmit">LOGIN</button>
+    <div class="switch-mode" id="authSwitch">
+      No account? <a id="authSwitchLink">REGISTER</a>
+    </div>
+  </div>
+</div>
+
+<script src="avatars.js?v=1771409778"></script>
+<script src="arcade-profile.js?v=1771409778"></script>
 <script>
+// Dynamic game count from cabinet elements
+const CABINET_COUNT = document.querySelectorAll('.cabinet').length;
+document.querySelector('.game-count').textContent = CABINET_COUNT + ' GAMES LOADED';
+document.getElementById('bootCabinets').textContent = 'LOADING ' + CABINET_COUNT + ' CABINETS... READY';
+
+// Build marquee from cabinet titles
+const cabinetNames = Array.from(document.querySelectorAll('.cabinet .game-title')).map(el => el.textContent.trim());
+const nameList = cabinetNames.map(n => '\u2605 ' + n).join(' ');
+document.getElementById('marqueeContent').textContent = nameList + ' \u2605 ' + CABINET_COUNT + ' GAMES READY TO PLAY \u2605 HIGH SCORES WELCOME \u2605 ' + nameList + ' \u2605';
+
 // Generate starfield (reduced count for performance)
 const sf = document.getElementById('starfield');
 for (let i = 0; i < 30; i++) {
@@ -907,6 +1110,207 @@ document.addEventListener('mousemove', (e) => {
     ticking = false;
   });
 });
+
+// ===== AUTH WIDGET =====
+const GAMES = [
+  { id: 'retro-basket', name: 'RETRO SHOOTOUT', label: 'HIGH SCORE' },
+  { id: 'retro-shooter', name: 'GALACTIC DEFENDER', label: 'HIGH SCORE' },
+  { id: 'obby', name: 'OBBY', label: 'FEWEST DEATHS' },
+  { id: 'retro-racing', name: 'VOID RUNNER', label: 'HIGH SCORE' },
+  { id: 'retro-paddle', name: 'NEON BREAKER', label: 'HIGH SCORE' },
+  { id: 'street-fighter', name: 'STREET BRAWL', label: 'MOST WINS' },
+];
+
+function renderAuthWidget() {
+  const w = document.getElementById('authWidget');
+  if (ArcadeProfile.isLoggedIn()) {
+    const av = ArcadeAvatars.drawToCanvas(ArcadeProfile.getAvatar(), 24);
+    av.className = 'avatar-display';
+    w.innerHTML = '';
+    w.appendChild(av);
+    const name = document.createElement('span');
+    name.className = 'user-name';
+    name.textContent = ArcadeProfile.getUsername().toUpperCase();
+    w.appendChild(name);
+    const profBtn = document.createElement('button');
+    profBtn.className = 'auth-btn';
+    profBtn.textContent = 'PROFILE';
+    profBtn.onclick = () => location.href = 'profile/';
+    w.appendChild(profBtn);
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'auth-btn logout';
+    logoutBtn.textContent = 'LOGOUT';
+    logoutBtn.onclick = () => { ArcadeProfile.logout(); renderAuthWidget(); loadLeaderboard(); };
+    w.appendChild(logoutBtn);
+  } else {
+    w.innerHTML = '';
+    const loginBtn = document.createElement('button');
+    loginBtn.className = 'auth-btn';
+    loginBtn.textContent = 'LOGIN';
+    loginBtn.onclick = () => openModal('login');
+    w.appendChild(loginBtn);
+    const regBtn = document.createElement('button');
+    regBtn.className = 'auth-btn';
+    regBtn.textContent = 'REGISTER';
+    regBtn.onclick = () => openModal('register');
+    w.appendChild(regBtn);
+  }
+}
+
+// ===== AUTH MODAL =====
+let authMode = 'login';
+let selectedAvatar = Math.floor(Math.random() * 16);
+
+function openModal(mode) {
+  authMode = mode;
+  document.getElementById('authModal').classList.add('active');
+  document.getElementById('authTitle').textContent = mode === 'login' ? 'LOGIN' : 'REGISTER';
+  document.getElementById('authSubmit').textContent = mode === 'login' ? 'LOGIN' : 'REGISTER';
+  document.getElementById('avatarSection').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('passWarning').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('authSwitchLink').textContent = mode === 'login' ? 'REGISTER' : 'LOGIN';
+  document.getElementById('authSwitch').innerHTML = mode === 'login'
+    ? 'No account? <a id="authSwitchLink">REGISTER</a>'
+    : 'Have account? <a id="authSwitchLink">LOGIN</a>';
+  document.getElementById('authSwitchLink').onclick = () => openModal(mode === 'login' ? 'register' : 'login');
+  document.getElementById('authError').textContent = '';
+  document.getElementById('authUser').value = '';
+  document.getElementById('authPass').value = '';
+  if (mode === 'register') buildAvatarPicker();
+}
+
+function buildAvatarPicker() {
+  const picker = document.getElementById('avatarPicker');
+  picker.innerHTML = '';
+  for (let i = 0; i < 16; i++) {
+    const opt = document.createElement('div');
+    opt.className = 'av-option' + (i === selectedAvatar ? ' selected' : '');
+    const c = ArcadeAvatars.drawToCanvas(i, 28);
+    opt.appendChild(c);
+    opt.onclick = () => {
+      selectedAvatar = i;
+      picker.querySelectorAll('.av-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+    };
+    picker.appendChild(opt);
+  }
+}
+
+document.getElementById('avatarRandom').onclick = () => {
+  selectedAvatar = Math.floor(Math.random() * 16);
+  buildAvatarPicker();
+};
+
+document.getElementById('authClose').onclick = () => document.getElementById('authModal').classList.remove('active');
+document.getElementById('authModal').onclick = (e) => {
+  if (e.target === document.getElementById('authModal')) document.getElementById('authModal').classList.remove('active');
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.getElementById('authModal').classList.remove('active');
+});
+
+document.getElementById('authSubmit').onclick = async () => {
+  const user = document.getElementById('authUser').value.trim();
+  const pass = document.getElementById('authPass').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+
+  if (!user || !pass) { errEl.textContent = 'FILL ALL FIELDS'; return; }
+
+  try {
+    if (authMode === 'login') {
+      await ArcadeProfile.login(user, pass);
+    } else {
+      await ArcadeProfile.register(user, pass, selectedAvatar);
+    }
+    document.getElementById('authModal').classList.remove('active');
+    renderAuthWidget();
+    loadLeaderboard();
+  } catch (e) {
+    errEl.textContent = e.message.toUpperCase();
+  }
+};
+
+// Enter key submits
+document.getElementById('authPass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('authSubmit').click();
+});
+
+// ===== LEADERBOARD =====
+let lbData = {};
+let activeGame = GAMES[0].id;
+
+function renderTabs() {
+  const tabs = document.getElementById('lbTabs');
+  tabs.innerHTML = '';
+  GAMES.forEach(g => {
+    const tab = document.createElement('button');
+    tab.className = 'lb-tab' + (g.id === activeGame ? ' active' : '');
+    tab.textContent = g.name;
+    tab.onclick = () => { activeGame = g.id; renderTabs(); renderTable(); };
+    tabs.appendChild(tab);
+  });
+}
+
+function renderTable() {
+  const container = document.getElementById('lbContent');
+  const entries = lbData[activeGame] || [];
+  const game = GAMES.find(g => g.id === activeGame);
+
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="lb-empty">NO SCORES YET</div>';
+    return;
+  }
+
+  let html = '<table class="lb-table"><thead><tr><th>RANK</th><th>PLAYER</th><th>' + game.label + '</th></tr></thead><tbody>';
+  entries.forEach(e => {
+    const rankClass = e.rank === 1 ? 'rank rank-1' : e.rank === 2 ? 'rank rank-2' : e.rank === 3 ? 'rank rank-3' : 'rank';
+    html += `<tr>
+      <td class="${rankClass}">#${e.rank}</td>
+      <td><div class="player-cell"><canvas id="lb-av-${activeGame}-${e.rank}" width="16" height="16" style="image-rendering:pixelated"></canvas>${e.username.toUpperCase()}</div></td>
+      <td class="score-val">${e.score.toLocaleString()}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  // Draw avatars
+  entries.forEach(e => {
+    const c = document.getElementById(`lb-av-${activeGame}-${e.rank}`);
+    if (c) ArcadeAvatars.draw(c.getContext('2d'), e.avatar, 0, 0, 16);
+  });
+}
+
+async function loadLeaderboard() {
+  try {
+    const data = await ArcadeProfile.getLeaderboard();
+    if (data) { lbData = data; renderTabs(); renderTable(); }
+    else { document.getElementById('lbContent').innerHTML = '<div class="lb-empty">SCORES UNAVAILABLE</div>'; renderTabs(); }
+  } catch {
+    document.getElementById('lbContent').innerHTML = '<div class="lb-empty">SCORES UNAVAILABLE</div>';
+    renderTabs();
+  }
+}
+
+renderAuthWidget();
+renderTabs();
+loadLeaderboard();
+
+// INSERT COIN opens register (or profile if logged in)
+document.getElementById('insertCoin').addEventListener('click', () => {
+  if (ArcadeProfile.isLoggedIn()) {
+    location.href = 'profile/';
+  } else {
+    openModal('register');
+  }
+});
+
+// Update INSERT COIN text based on auth state
+function updateCoinText() {
+  const coin = document.getElementById('insertCoin');
+  coin.textContent = ArcadeProfile.isLoggedIn() ? 'WELCOME ' + ArcadeProfile.getUsername().toUpperCase() : 'INSERT COIN';
+}
+updateCoinText();
 </script>
 
 </body>

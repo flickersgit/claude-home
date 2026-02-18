@@ -5,22 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>GALACTIC DEFENDER - Retro Shooter</title>
 <style>
+:root {
+  --arcade-hud-offset: 40px;
+  --viewport-h: 100vh;
+}
+@supports (height: 100dvh) {
+  :root { --viewport-h: 100dvh; }
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   background: #000;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  position: relative;
+  width: 100vw;
+  min-height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+  height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+  padding: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 0px);
   overflow: hidden;
   font-family: 'Courier New', monospace;
 }
-@supports (height: 100dvh) {
-  body { height: 100dvh; }
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+  max-width: calc(100vw - 20px);
+  height: auto;
+  margin: 0 auto;
 }
-canvas { display: block; image-rendering: pixelated; touch-action: none; }
 .home-btn {
-  position: fixed; top: 8px; right: 64px; z-index: 999;
+  position: fixed; top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px) + 8px); right: 64px; z-index: 999;
   width: 48px; height: 48px; border-radius: 8px;
   background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.3);
   color: rgba(255,255,255,0.6); font-size: 11px; font-weight: bold;
@@ -189,7 +204,7 @@ h2 {
 }
 #btn-pause {
   position: fixed;
-  top: 8px;
+  top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px) + 8px);
   right: 8px;
   width: 48px;
   height: 48px;
@@ -209,7 +224,7 @@ h2 {
   touch-action: none;
 }
 @media (pointer: coarse) {
-  body { align-items: flex-start; padding-top: env(safe-area-inset-top, 0px); }
+  body { align-items: center; }
   #touchControls { display: block; }
   #btn-pause { display: flex; }
   #hud { font-size: 13px; padding: 8px 124px 8px 12px; }
@@ -225,7 +240,6 @@ h2 {
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade">EXIT</a>
 
 <canvas id="game"></canvas>
 
@@ -275,14 +289,20 @@ canvas.width = W; canvas.height = H;
 
 // Scale canvas to fit screen
 function resize() {
-  const isMobile = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-  const availH = isMobile ? window.innerHeight - 170 : window.innerHeight;
-  const scale = Math.min(window.innerWidth / W, availH / H);
-  canvas.style.width = W * scale + 'px';
-  canvas.style.height = H * scale + 'px';
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const viewportH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const reservedTop = 40;
+  const reservedBottom = isMobile ? 180 : 0;
+  const availW = Math.max(220, window.innerWidth - 20);
+  const availH = Math.max(220, viewportH - reservedTop - reservedBottom - 8);
+  const desktopCap = 1.2;
+  const scale = Math.min(availW / W, availH / H, isMobile ? 1 : desktopCap);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
 }
 resize();
 window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // Game state
 let state = 'menu'; // menu, playing, gameover, paused
@@ -561,6 +581,14 @@ function gameOver() {
   document.getElementById('gameOverScreen').style.display = 'flex';
   document.getElementById('finalScore').textContent = 'SCORE: ' + score;
   document.getElementById('finalWave').textContent = 'WAVE: ' + wave;
+  if (window.ArcadeProfile) {
+    ArcadeProfile.submitScore('retro-shooter', score).then(r => {
+      if (r) {
+        const info = r.isNewBest ? 'NEW BEST! RANK: #' + r.globalRank : 'RANK: #' + r.globalRank + ' | BEST: ' + r.personalBest;
+        document.getElementById('finalWave').textContent += '  |  ' + info;
+      }
+    });
+  }
 }
 
 function updateHUD() {
@@ -1160,6 +1188,8 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
 initStars();
 requestAnimationFrame(gameLoop);
 </script>
-
+<script src="../avatars.js?v=1771409778"></script>
+<script src="../arcade-profile.js?v=1771409778"></script>
+<script>if(window.ArcadeProfile)ArcadeProfile.renderHUD({accentColor:'#0f0'});</script>
 </body>
 </html>

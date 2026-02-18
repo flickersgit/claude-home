@@ -5,28 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SPACE RACING - Void Runner</title>
 <style>
+  :root {
+    --arcade-hud-offset: 40px;
+    --viewport-h: 100vh;
+  }
+  @supports (height: 100dvh) {
+    :root { --viewport-h: 100dvh; }
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #000;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    width: 100vw;
+    min-height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+    height: calc(var(--viewport-h) - var(--arcade-hud-offset));
+    padding: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 0px);
     font-family: 'Courier New', monospace;
     overflow: hidden;
-  }
-  @supports (height: 100dvh) {
-    body { height: 100dvh; }
   }
   #gameContainer {
     position: relative;
     border: 2px solid #0088ff;
     box-shadow: 0 0 40px rgba(0,136,255,0.4), inset 0 0 40px rgba(0,136,255,0.05);
     image-rendering: pixelated;
+    max-width: calc(100vw - 20px);
+    margin: 0 auto;
   }
-  canvas { display: block; }
+  canvas { display: block; max-width: 100%; height: auto; margin: 0 auto; }
   .home-btn {
-    position: fixed; top: 12px; right: 12px; z-index: 999;
+    position: fixed; top: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px) + 12px); right: 12px; z-index: 999;
     padding: 8px 16px; border-radius: 0;
     background: transparent; border: 2px solid #00ccff;
     color: #00ccff; cursor: pointer;
@@ -122,16 +131,16 @@
   @media (pointer: coarse) {
     body {
       flex-direction: column;
-      padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+      padding: calc(var(--arcade-hud-offset) + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 0px);
     }
     #hud { padding-right: 80px; }
     #overlay h1 { font-size: 28px; letter-spacing: 4px; }
     #gameContainer {
       flex-shrink: 1; min-height: 0;
-      max-height: calc(100dvh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(var(--viewport-h) - 140px - var(--arcade-hud-offset));
     }
     canvas {
-      max-height: calc(100dvh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(var(--viewport-h) - 140px - var(--arcade-hud-offset));
       width: auto;
     }
     #touchControls {
@@ -167,7 +176,6 @@
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade">EXIT</a>
 
 <div id="gameContainer">
   <canvas id="gameCanvas"></canvas>
@@ -204,6 +212,19 @@ const ctx = canvas.getContext('2d');
 const W = 480, H = 720;
 canvas.width = W;
 canvas.height = H;
+
+function resizeCanvas() {
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const viewportH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const availW = Math.max(220, window.innerWidth - 20);
+  const availH = Math.max(220, viewportH - 40 - (isMobile ? 150 : 8));
+  const scale = Math.min(availW / W, availH / H, isMobile ? 1 : 1.2);
+  canvas.style.width = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvas);
 
 const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('startBtn');
@@ -1063,11 +1084,11 @@ function hitObstacle() {
     addParticle(player.x, player.y, '#ffcc00', 20, { spread: 12, life: 35, glow: true });
     addParticle(player.x, player.y, '#ff0000', 15, { spread: 18, life: 45 });
     state = 'gameover';
-    if (score > highScore) {
-      highScore = score;
-      localStorage.setItem('voidRunnerHigh', highScore.toString());
-    }
+    if (score > highScore) { highScore = score; }
     showOverlay('DESTROYED', score);
+    if (window.ArcadeProfile) {
+      ArcadeProfile.submitScore('retro-racing', score);
+    }
   }
 }
 
@@ -1497,5 +1518,8 @@ startBtn.addEventListener('click', () => {
 
 requestAnimationFrame(gameLoop);
 </script>
+<script src="../avatars.js?v=1771409778"></script>
+<script src="../arcade-profile.js?v=1771409778"></script>
+<script>if(window.ArcadeProfile)ArcadeProfile.renderHUD({accentColor:'#0af'});</script>
 </body>
 </html>

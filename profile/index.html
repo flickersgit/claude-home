@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLAYER PROFILE - Game Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #05050f;
+    --neon-pink: #ff2266;
+    --neon-cyan: #00ffee;
+    --neon-yellow: #ffe033;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg-deep);
+    color: #fff;
+    font-family: 'Silkscreen', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* CRT scanlines */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+  .top-bar {
+    width: 100%; padding: 12px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0,0,0,0.6); border-bottom: 2px solid #222;
+  }
+  .top-bar a {
+    color: var(--neon-cyan); text-decoration: none; font-family: 'Press Start 2P', monospace;
+    font-size: 10px; letter-spacing: 1px;
+  }
+  .top-bar a:hover { color: var(--neon-yellow); }
+  .logout-btn {
+    background: none; border: 1px solid #f44; color: #f44;
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    padding: 6px 12px; cursor: pointer; letter-spacing: 1px;
+  }
+  .logout-btn:hover { background: #f44; color: #000; }
+
+  .profile-card {
+    margin-top: 40px; padding: 30px;
+    background: rgba(255,255,255,0.03);
+    border: 2px solid #333; border-radius: 8px;
+    width: 90%; max-width: 500px;
+    text-align: center;
+  }
+  .avatar-display {
+    margin: 0 auto 16px;
+    width: 96px; height: 96px;
+    image-rendering: pixelated;
+    border: 3px solid var(--neon-cyan);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .avatar-display:hover { border-color: var(--neon-yellow); }
+  .username {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 18px; color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0,255,238,0.5);
+    margin-bottom: 6px;
+  }
+  .cumulative {
+    font-size: 12px; color: var(--neon-yellow);
+    text-shadow: 0 0 8px rgba(255,224,51,0.4);
+    margin-bottom: 4px;
+  }
+  .member-since { font-size: 10px; color: #666; }
+
+  .avatar-picker-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 1000;
+    justify-content: center; align-items: center;
+  }
+  .avatar-picker-overlay.active { display: flex; }
+  .avatar-picker-box {
+    background: #111; border: 2px solid var(--neon-cyan);
+    border-radius: 8px; padding: 24px; text-align: center;
+  }
+  .avatar-picker-box h3 {
+    font-family: 'Press Start 2P', monospace; font-size: 11px;
+    color: var(--neon-cyan); margin-bottom: 16px;
+  }
+  .avatar-grid {
+    display: grid; grid-template-columns: repeat(4, 64px);
+    gap: 8px; justify-content: center; margin-bottom: 16px;
+  }
+  .avatar-option {
+    width: 64px; height: 64px; cursor: pointer;
+    border: 2px solid #333; border-radius: 4px;
+    image-rendering: pixelated; transition: border-color 0.15s;
+  }
+  .avatar-option:hover { border-color: var(--neon-yellow); }
+  .avatar-option.selected { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0,255,238,0.4); }
+  .picker-btn {
+    background: none; border: 1px solid var(--neon-cyan); color: var(--neon-cyan);
+    font-family: 'Press Start 2P', monospace; font-size: 9px;
+    padding: 8px 16px; cursor: pointer; margin: 0 4px;
+  }
+  .picker-btn:hover { background: var(--neon-cyan); color: #000; }
+  .picker-btn.cancel { border-color: #666; color: #666; }
+  .picker-btn.cancel:hover { background: #666; color: #000; }
+
+  .section-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; color: var(--neon-pink);
+    text-shadow: 0 0 8px rgba(255,34,102,0.4);
+    margin: 30px 0 16px; text-align: center;
+  }
+
+  .scores-table {
+    width: 90%; max-width: 500px;
+    border-collapse: collapse; margin-bottom: 30px;
+  }
+  .scores-table th {
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    color: var(--neon-yellow); padding: 10px 8px;
+    border-bottom: 2px solid #333; text-align: left;
+  }
+  .scores-table td {
+    font-size: 11px; padding: 10px 8px;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .scores-table .game-name { color: var(--neon-cyan); }
+  .scores-table .best-val { color: var(--neon-yellow); font-weight: bold; }
+  .scores-table .rank-val { color: #0f0; }
+  .scores-table .plays-val { color: #888; }
+
+  .warning-box {
+    width: 90%; max-width: 500px;
+    background: rgba(255,68,68,0.08);
+    border: 1px solid #f44; border-radius: 6px;
+    padding: 16px; margin: 20px 0 40px;
+    font-size: 10px; color: #f88; text-align: center; line-height: 1.6;
+  }
+  .warning-box strong { color: #f44; }
+
+  .not-logged-in {
+    text-align: center; margin-top: 80px;
+    font-family: 'Press Start 2P', monospace; font-size: 12px;
+    color: #888;
+  }
+  .not-logged-in a {
+    display: inline-block; margin-top: 20px;
+    color: var(--neon-cyan); text-decoration: none;
+    border: 1px solid var(--neon-cyan); padding: 10px 20px;
+    font-size: 10px;
+  }
+  .not-logged-in a:hover { background: var(--neon-cyan); color: #000; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="../">&lt; ARCADE</a>
+  <button class="logout-btn" id="logoutBtn" style="display:none;">LOGOUT</button>
+</div>
+
+<div id="profileContent" style="display:none; width:100%; display:flex; flex-direction:column; align-items:center;">
+  <div class="profile-card">
+    <canvas class="avatar-display" id="avatarCanvas" width="96" height="96" title="Click to change avatar"></canvas>
+    <div class="username" id="usernameDisplay"></div>
+    <div class="cumulative" id="cumulativeDisplay"></div>
+    <div class="member-since" id="memberSince"></div>
+  </div>
+
+  <div class="section-title">PERSONAL BESTS</div>
+  <table class="scores-table">
+    <thead>
+      <tr><th>GAME</th><th>BEST</th><th>RANK</th><th>PLAYS</th></tr>
+    </thead>
+    <tbody id="scoresBody"></tbody>
+  </table>
+
+  <div class="warning-box">
+    <strong>WARNING:</strong> THERE IS NO PASSWORD RECOVERY.<br>
+    IF YOU FORGET YOUR PASSWORD, YOUR PROFILE IS GONE FOREVER.
+  </div>
+</div>
+
+<div class="not-logged-in" id="notLoggedIn">
+  NOT LOGGED IN
+  <br>
+  <a href="../">GO TO ARCADE</a>
+</div>
+
+<!-- Avatar Picker Overlay -->
+<div class="avatar-picker-overlay" id="avatarPicker">
+  <div class="avatar-picker-box">
+    <h3>CHOOSE AVATAR</h3>
+    <div class="avatar-grid" id="avatarGrid"></div>
+    <div>
+      <button class="picker-btn cancel" id="pickerCancel">CANCEL</button>
+      <button class="picker-btn" id="pickerSave">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<script src="../avatars.js"></script>
+<script src="../arcade-profile.js"></script>
+<script>
+const GAMES = [
+  { id: 'retro-basket', name: 'RETRO SHOOTOUT' },
+  { id: 'retro-shooter', name: 'GALACTIC DEFENDER' },
+  { id: 'obby', name: 'OBBY' },
+  { id: 'retro-racing', name: 'VOID RUNNER' },
+  { id: 'retro-paddle', name: 'RETRO PADDLE' },
+  { id: 'street-fighter', name: 'STREET BRAWL' }
+];
+
+let selectedAvatar = 0;
+
+async function loadProfile() {
+  if (!ArcadeProfile.isLoggedIn()) {
+    document.getElementById('notLoggedIn').style.display = '';
+    document.getElementById('profileContent').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'none';
+    return;
+  }
+  document.getElementById('notLoggedIn').style.display = 'none';
+  document.getElementById('profileContent').style.display = 'flex';
+  document.getElementById('logoutBtn').style.display = '';
+
+  try {
+    const profile = await ArcadeProfile.getProfile();
+    document.getElementById('usernameDisplay').textContent = profile.username;
+    document.getElementById('cumulativeDisplay').textContent = 'CUMULATIVE: ' + (profile.cumulative || 0);
+    document.getElementById('memberSince').textContent = 'JOINED ' + new Date(profile.created).toLocaleDateString();
+
+    selectedAvatar = profile.avatar || 0;
+    const canvas = document.getElementById('avatarCanvas');
+    ArcadeAvatars.draw(canvas.getContext('2d'), selectedAvatar, 0, 0, 96);
+
+    const body = document.getElementById('scoresBody');
+    body.innerHTML = '';
+    GAMES.forEach(g => {
+      const s = (profile.scores || {})[g.id];
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="game-name">' + g.name + '</td>' +
+        '<td class="best-val">' + (s ? s.best : '-') + '</td>' +
+        '<td class="rank-val">' + (s ? '#' + s.rank : '-') + '</td>' +
+        '<td class="plays-val">' + (s ? s.plays : '0') + '</td>';
+      body.appendChild(tr);
+    });
+  } catch (e) {
+    document.getElementById('usernameDisplay').textContent = ArcadeProfile.getUsername() || '???';
+    document.getElementById('cumulativeDisplay').textContent = '';
+  }
+}
+
+// Avatar picker
+function buildAvatarGrid() {
+  const grid = document.getElementById('avatarGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < ArcadeAvatars.count; i++) {
+    const c = ArcadeAvatars.drawToCanvas(i, 64);
+    c.className = 'avatar-option' + (i === selectedAvatar ? ' selected' : '');
+    c.dataset.id = i;
+    c.addEventListener('click', () => {
+      grid.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
+      c.classList.add('selected');
+      selectedAvatar = i;
+    });
+    grid.appendChild(c);
+  }
+}
+
+document.getElementById('avatarCanvas').addEventListener('click', () => {
+  buildAvatarGrid();
+  document.getElementById('avatarPicker').classList.add('active');
+});
+
+document.getElementById('pickerCancel').addEventListener('click', () => {
+  document.getElementById('avatarPicker').classList.remove('active');
+});
+
+document.getElementById('pickerSave').addEventListener('click', async () => {
+  document.getElementById('avatarPicker').classList.remove('active');
+  try {
+    await ArcadeProfile.updateAvatar(selectedAvatar);
+    const canvas = document.getElementById('avatarCanvas');
+    ArcadeAvatars.draw(canvas.getContext('2d'), selectedAvatar, 0, 0, 96);
+  } catch (e) {}
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  ArcadeProfile.logout();
+  loadProfile();
+});
+
+loadProfile();
+</script>
+</body>
+</html>

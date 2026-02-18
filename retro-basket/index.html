@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>RETRO SHOOTOUT - MJ vs Curry</title>
 <style>
+:root{--arcade-hud-offset:40px;--viewport-h:100vh}
+@supports (height:100dvh){:root{--viewport-h:100dvh}}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;height:100dvh;overflow:hidden;font-family:'Courier New',monospace;flex-direction:column}
-canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.home-btn{position:fixed;top:8px;right:60px;z-index:999;min-width:48px;min-height:48px;border-radius:8px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.5);color:#fff;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;-webkit-tap-highlight-color:transparent;user-select:none;transition:background 0.1s}
+body{background:#111;display:flex;justify-content:center;align-items:center;width:100vw;min-height:calc(var(--viewport-h) - var(--arcade-hud-offset));height:calc(var(--viewport-h) - var(--arcade-hud-offset));padding:calc(var(--arcade-hud-offset) + env(safe-area-inset-top,0px)) 10px env(safe-area-inset-bottom,0px);overflow:hidden;font-family:'Courier New',monospace;flex-direction:column}
+canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radius:4px;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;max-width:calc(100vw - 20px);height:auto;margin:0 auto}
+.home-btn{position:fixed;top:calc(var(--arcade-hud-offset) + env(safe-area-inset-top,0px) + 8px);right:60px;z-index:999;min-width:48px;min-height:48px;border-radius:8px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.5);color:#fff;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;-webkit-tap-highlight-color:transparent;user-select:none;transition:background 0.1s}
 .home-btn:hover,.home-btn:active{background:rgba(255,255,0,0.35);border-color:#ff0}
 #touch-controls{display:none;position:fixed;bottom:env(safe-area-inset-bottom, 0px);left:0;width:100%;pointer-events:none;z-index:10;padding:10px;box-sizing:border-box}
 #touch-controls.active{display:flex;justify-content:space-between;align-items:flex-end}
@@ -18,8 +20,8 @@ canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radi
 .touch-btn-row{display:flex;gap:8px}
 #btn-action{min-width:80px;min-height:80px;font-size:15px;border-radius:50%;background:rgba(255,200,0,0.18);border-color:rgba(255,200,0,0.6)}
 #btn-up,#btn-down{min-width:56px;min-height:56px}
-#btn-mute{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:8px;right:8px;border-radius:8px;pointer-events:auto;z-index:11}
-#btn-back{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:8px;left:8px;border-radius:8px;pointer-events:auto;z-index:11}
+#btn-mute{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:calc(var(--arcade-hud-offset) + env(safe-area-inset-top,0px) + 8px);right:8px;border-radius:8px;pointer-events:auto;z-index:11}
+#btn-back{min-width:48px;min-height:48px;font-size:11px;position:fixed;top:calc(var(--arcade-hud-offset) + env(safe-area-inset-top,0px) + 8px);left:8px;border-radius:8px;pointer-events:auto;z-index:11}
 @media (pointer:coarse){
   #touch-controls{display:flex;justify-content:space-between;align-items:flex-end}
   #btn-mute,#btn-back{display:flex}
@@ -31,7 +33,6 @@ canvas{display:block;image-rendering:pixelated;border:2px solid #333;border-radi
 </style>
 </head>
 <body>
-<a href="../" class="home-btn" title="Back to Arcade">BACK</a>
 <canvas id="game"></canvas>
 <!-- Touch controls for mobile -->
 <button class="touch-btn" id="btn-back" style="display:none">ESC</button>
@@ -50,12 +51,14 @@ C.width=W;C.height=H;
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
 function resize(){
-  // Reserve space for touch controls on mobile (approx 100px at bottom)
-  const availH=isTouchDevice?window.innerHeight-110:window.innerHeight;
-  const s=Math.min(window.innerWidth/W,availH/H)*0.95;
+  const viewportH=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  const availW=Math.max(220,window.innerWidth-20);
+  const availH=Math.max(220,viewportH-40-(isTouchDevice?120:0)-8);
+  const s=Math.min(availW/W,availH/H,isTouchDevice?1:1.15);
   C.style.width=W*s+'px';C.style.height=H*s+'px';
 }
 resize();window.addEventListener('resize',resize);
+if(window.visualViewport)window.visualViewport.addEventListener('resize',resize);
 
 // ==================== MUSIC ENGINE ====================
 const AC=new(window.AudioContext||window.webkitAudioContext)();
@@ -1058,6 +1061,10 @@ function nextTurn(){
         state='result';
         snd('buzzer');
         resultMusicTimeout=setTimeout(()=>{resultMusicTimeout=null;playResultMusic();},800);
+        // Submit player 1 (MJ) score to leaderboard
+        if(typeof ArcadeProfile!=='undefined'&&ArcadeProfile.isLoggedIn()){
+          ArcadeProfile.submitScore('retro-basket',scores[0]).catch(()=>{});
+        }
       }
     }
   } else {
@@ -2052,5 +2059,8 @@ document.addEventListener('keydown',function startAudioK(){
 },{once:false});
 requestAnimationFrame(gameLoop);
 </script>
+<script src="../avatars.js?v=1771409778"></script>
+<script src="../arcade-profile.js?v=1771409778"></script>
+<script>ArcadeProfile.renderHUD({accentColor:'#ff0'});</script>
 </body>
 </html>

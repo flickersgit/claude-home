@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADMIN PANEL - Game Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #05050f;
+    --neon-pink: #ff2266;
+    --neon-cyan: #00ffee;
+    --neon-yellow: #ffe033;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg-deep);
+    color: #fff;
+    font-family: 'Silkscreen', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+  .top-bar {
+    width: 100%; padding: 12px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0,0,0,0.6); border-bottom: 2px solid #f44;
+  }
+  .top-bar a {
+    color: var(--neon-cyan); text-decoration: none; font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+  }
+  .top-bar a:hover { color: var(--neon-yellow); }
+  .admin-badge {
+    font-family: 'Press Start 2P', monospace; font-size: 9px;
+    color: #f44; text-shadow: 0 0 8px rgba(255,68,68,0.5);
+  }
+
+  .auth-box {
+    margin-top: 60px; padding: 30px;
+    background: rgba(255,255,255,0.03);
+    border: 2px solid #333; border-radius: 8px;
+    width: 90%; max-width: 400px; text-align: center;
+  }
+  .auth-box h2 {
+    font-family: 'Press Start 2P', monospace; font-size: 11px;
+    color: #f44; margin-bottom: 20px;
+  }
+  .auth-box input {
+    width: 100%; padding: 10px; margin-bottom: 12px;
+    background: #111; border: 1px solid #333; color: #fff;
+    font-family: 'Silkscreen', monospace; font-size: 13px;
+    border-radius: 4px;
+  }
+  .auth-box input:focus { border-color: #f44; outline: none; }
+  .auth-box button {
+    width: 100%; padding: 10px;
+    background: #f44; border: none; color: #000;
+    font-family: 'Press Start 2P', monospace; font-size: 10px;
+    cursor: pointer; border-radius: 4px;
+  }
+  .auth-box button:hover { background: #ff6666; }
+  .auth-box .error { color: #f44; font-size: 10px; margin-top: 8px; }
+
+  .panel { display: none; width: 90%; max-width: 700px; margin-top: 30px; }
+  .panel.active { display: block; }
+
+  .section-title {
+    font-family: 'Press Start 2P', monospace; font-size: 12px;
+    color: var(--neon-pink); margin: 20px 0 16px;
+    text-shadow: 0 0 8px rgba(255,34,102,0.4);
+  }
+
+  .user-list { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+  .user-list th {
+    font-family: 'Press Start 2P', monospace; font-size: 7px;
+    color: var(--neon-yellow); padding: 10px 6px;
+    border-bottom: 2px solid #333; text-align: left;
+  }
+  .user-list td {
+    font-size: 11px; padding: 10px 6px;
+    border-bottom: 1px solid #1a1a1a;
+    vertical-align: middle;
+  }
+  .user-list .avatar-cell canvas {
+    image-rendering: pixelated; vertical-align: middle;
+  }
+  .user-list .name-cell { color: var(--neon-cyan); }
+  .user-list .score-cell { color: var(--neon-yellow); }
+  .user-list .date-cell { color: #666; font-size: 9px; }
+
+  .action-btn {
+    background: none; border: 1px solid; padding: 4px 10px;
+    font-family: 'Silkscreen', monospace; font-size: 9px;
+    cursor: pointer; border-radius: 3px; margin: 0 2px;
+  }
+  .action-btn.reset { border-color: #fa0; color: #fa0; }
+  .action-btn.reset:hover { background: #fa0; color: #000; }
+  .action-btn.delete { border-color: #f44; color: #f44; }
+  .action-btn.delete:hover { background: #f44; color: #000; }
+
+  .confirm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 1000;
+    justify-content: center; align-items: center;
+  }
+  .confirm-overlay.active { display: flex; }
+  .confirm-box {
+    background: #111; border: 2px solid #f44; border-radius: 8px;
+    padding: 24px; text-align: center; max-width: 350px;
+  }
+  .confirm-box p {
+    font-size: 12px; color: #fff; margin-bottom: 20px; line-height: 1.6;
+  }
+  .confirm-box .warn { color: #f44; font-family: 'Press Start 2P', monospace; font-size: 9px; }
+  .confirm-btn {
+    background: none; border: 1px solid; padding: 8px 16px;
+    font-family: 'Press Start 2P', monospace; font-size: 9px;
+    cursor: pointer; margin: 0 6px; border-radius: 4px;
+  }
+  .confirm-btn.yes { border-color: #f44; color: #f44; }
+  .confirm-btn.yes:hover { background: #f44; color: #000; }
+  .confirm-btn.no { border-color: #666; color: #666; }
+  .confirm-btn.no:hover { background: #666; color: #000; }
+
+  .status-msg {
+    font-size: 10px; padding: 8px 12px; margin: 8px 0;
+    border-radius: 4px; text-align: center;
+  }
+  .status-msg.ok { background: rgba(0,255,0,0.1); color: #0f0; border: 1px solid #0f0; }
+  .status-msg.err { background: rgba(255,0,0,0.1); color: #f44; border: 1px solid #f44; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="../">&lt; ARCADE</a>
+  <span class="admin-badge">ADMIN PANEL</span>
+</div>
+
+<!-- Auth gate -->
+<div class="auth-box" id="authBox">
+  <h2>ADMIN ACCESS</h2>
+  <input type="password" id="secretInput" placeholder="ENTER ADMIN SECRET" autocomplete="off">
+  <button id="authBtn">AUTHENTICATE</button>
+  <div class="error" id="authError"></div>
+</div>
+
+<!-- Admin panel -->
+<div class="panel" id="adminPanel">
+  <div class="section-title">REGISTERED USERS</div>
+  <div id="statusArea"></div>
+  <table class="user-list">
+    <thead>
+      <tr><th></th><th>USER</th><th>SCORES</th><th>JOINED</th><th>ACTIONS</th></tr>
+    </thead>
+    <tbody id="usersBody"></tbody>
+  </table>
+</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <p id="confirmText"></p>
+    <div>
+      <button class="confirm-btn no" id="confirmNo">CANCEL</button>
+      <button class="confirm-btn yes" id="confirmYes">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<script src="../avatars.js"></script>
+<script>
+let adminSecret = '';
+const API = window.location.origin;
+
+function apiHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret };
+}
+
+// Auth
+document.getElementById('authBtn').addEventListener('click', authenticate);
+document.getElementById('secretInput').addEventListener('keydown', e => { if (e.key === 'Enter') authenticate(); });
+
+async function authenticate() {
+  adminSecret = document.getElementById('secretInput').value.trim();
+  if (!adminSecret) return;
+  document.getElementById('authError').textContent = '';
+  try {
+    const res = await fetch(API + '/api/admin/users', { headers: apiHeaders() });
+    if (!res.ok) throw new Error('Invalid secret');
+    document.getElementById('authBox').style.display = 'none';
+    document.getElementById('adminPanel').classList.add('active');
+    const users = await res.json();
+    renderUsers(users);
+  } catch (e) {
+    document.getElementById('authError').textContent = 'ACCESS DENIED';
+  }
+}
+
+function renderUsers(users) {
+  const body = document.getElementById('usersBody');
+  body.innerHTML = '';
+  if (!users || !users.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#666;">NO USERS</td></tr>';
+    return;
+  }
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+
+    // Build cells without innerHTML to preserve canvas
+    const avatarTd = document.createElement('td');
+    avatarTd.className = 'avatar-cell';
+    avatarTd.appendChild(ArcadeAvatars.drawToCanvas(u.avatar || 0, 32));
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'name-cell';
+    nameTd.textContent = u.username;
+
+    const scoreTd = document.createElement('td');
+    scoreTd.className = 'score-cell';
+    scoreTd.textContent = u.score_count || 0;
+
+    const dateTd = document.createElement('td');
+    dateTd.className = 'date-cell';
+    dateTd.textContent = new Date(u.created_at).toLocaleDateString();
+
+    const actionTd = document.createElement('td');
+
+    tr.appendChild(avatarTd);
+    tr.appendChild(nameTd);
+    tr.appendChild(scoreTd);
+    tr.appendChild(dateTd);
+    tr.appendChild(actionTd);
+
+    // Action buttons
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'action-btn reset';
+    resetBtn.textContent = 'RESET';
+    resetBtn.addEventListener('click', () => confirmAction(
+      'Reset ALL scores for <span class="warn">' + escHtml(u.username) + '</span>?<br>This cannot be undone.',
+      () => resetScores(u.id, u.username)
+    ));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'action-btn delete';
+    deleteBtn.textContent = 'DELETE';
+    deleteBtn.addEventListener('click', () => confirmAction(
+      'Permanently DELETE <span class="warn">' + escHtml(u.username) + '</span> and all their data?<br>This cannot be undone.',
+      () => deleteUser(u.id, u.username)
+    ));
+
+    actionTd.appendChild(resetBtn);
+    actionTd.appendChild(deleteBtn);
+    body.appendChild(tr);
+  });
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Confirm dialog
+let pendingAction = null;
+function confirmAction(html, fn) {
+  document.getElementById('confirmText').innerHTML = html;
+  pendingAction = fn;
+  document.getElementById('confirmOverlay').classList.add('active');
+}
+document.getElementById('confirmNo').addEventListener('click', () => {
+  document.getElementById('confirmOverlay').classList.remove('active');
+  pendingAction = null;
+});
+document.getElementById('confirmYes').addEventListener('click', () => {
+  document.getElementById('confirmOverlay').classList.remove('active');
+  if (pendingAction) pendingAction();
+  pendingAction = null;
+});
+
+function showStatus(msg, ok) {
+  const area = document.getElementById('statusArea');
+  area.innerHTML = '<div class="status-msg ' + (ok ? 'ok' : 'err') + '">' + msg + '</div>';
+  setTimeout(() => { area.innerHTML = ''; }, 4000);
+}
+
+async function resetScores(userId, username) {
+  try {
+    const res = await fetch(API + '/api/admin/users/' + userId + '/scores', {
+      method: 'DELETE', headers: apiHeaders()
+    });
+    if (!res.ok) throw new Error('Failed');
+    showStatus('Scores reset for ' + username, true);
+    refreshUsers();
+  } catch (e) {
+    showStatus('Failed to reset scores', false);
+  }
+}
+
+async function deleteUser(userId, username) {
+  try {
+    const res = await fetch(API + '/api/admin/users/' + userId, {
+      method: 'DELETE', headers: apiHeaders()
+    });
+    if (!res.ok) throw new Error('Failed');
+    showStatus('Deleted ' + username, true);
+    refreshUsers();
+  } catch (e) {
+    showStatus('Failed to delete user', false);
+  }
+}
+
+async function refreshUsers() {
+  try {
+    const res = await fetch(API + '/api/admin/users', { headers: apiHeaders() });
+    const users = await res.json();
+    renderUsers(users);
+  } catch (e) {}
+}
+</script>
+</body>
+</html>
